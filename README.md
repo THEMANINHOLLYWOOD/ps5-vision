@@ -1,5 +1,7 @@
 # ps5-vision
 
+[![CI](https://github.com/THEMANINHOLLYWOOD/ps5-vision/actions/workflows/ci.yml/badge.svg)](https://github.com/THEMANINHOLLYWOOD/ps5-vision/actions/workflows/ci.yml)
+
 Play your PS5 in a web browser: on a giant virtual screen in Apple Vision Pro,
 or on a laptop, tablet or phone. Nothing is installed on the device you play on.
 

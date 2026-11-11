@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>PS5 (capture card)</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main id="stage">
+    <video id="screen" playsinline autoplay muted></video>
+
+    <header id="hud" hidden>
+      <div class="hud-group">
+        <span id="cap-info" class="chip chip-quiet"></span>
+      </div>
+      <div class="hud-group">
+        <button id="btn-fullscreen" type="button">Fullscreen</button>
+        <button id="btn-stop" type="button" class="danger">Stop</button>
+      </div>
+    </header>
+
+    <section id="overlay">
+      <div id="panel-start" class="panel">
+        <p class="badge">HDMI capture card</p>
+        <h1>PS5</h1>
+        <p class="note">Shows the PS5's own HDMI picture with almost no delay. Plug the PS5 into a USB capture card connected to this device.</p>
+        <div class="row">
+          <label>
+            <span>Video</span>
+            <select id="opt-video"><option value="">Pick after Start</option></select>
+          </label>
+          <label>
+            <span>Sound</span>
+            <select id="opt-audio"><option value="">Pick after Start</option></select>
+          </label>
+        </div>
+        <button id="btn-start" type="button" class="primary">Start</button>
+        <p id="cap-note" class="note small">The browser will ask to use the camera and microphone: that is the capture card. On the PS5, turn off Settings &gt; System &gt; HDMI &gt; Enable HDCP, or the picture stays black.</p>
+        <p class="note small"><a href="/">Back to Remote Play</a></p>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/capture.js"></script>
+</body>
+</html>

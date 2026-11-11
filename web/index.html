@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>PS5</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main id="stage">
+    <video id="screen" playsinline autoplay></video>
+
+    <header id="hud" hidden>
+      <div class="hud-group">
+        <span id="pad-indicator" class="chip" data-on="false">No controller</span>
+        <span id="stats" class="chip chip-quiet"></span>
+      </div>
+      <div class="hud-group">
+        <div class="chip volume">
+          <button id="btn-mute" type="button" class="icon" aria-label="Mute">🔊</button>
+          <input id="volume" type="range" min="0" max="100" step="1" value="80" aria-label="Volume">
+        </div>
+        <button id="btn-refresh" type="button" title="Reconnect the picture if it freezes or lags">Refresh</button>
+        <button id="btn-ps" type="button" title="Press the PS button">PS</button>
+        <button id="btn-touchpad" type="button" title="Press the touchpad">Touchpad</button>
+        <button id="btn-fullscreen" type="button">Fullscreen</button>
+        <button id="btn-rest" type="button" title="End and put the PS5 in rest mode">Rest mode</button>
+        <button id="btn-end" type="button" class="danger">End</button>
+      </div>
+    </header>
+
+    <p id="toast" class="toast" role="status" hidden></p>
+
+    <section id="overlay">
+      <!-- Shown before playing. -->
+      <div id="panel-start" class="panel">
+        <p id="mode-badge" class="badge" hidden>Test pattern</p>
+        <h1 id="console-name">PS5</h1>
+        <p id="start-note" class="note">Checking the bridge…</p>
+        <label id="code-row" hidden>
+          <span>Access code</span>
+          <input id="code-input" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" aria-describedby="start-note">
+        </label>
+        <div class="row" id="quality-row">
+          <label>
+            <span>Resolution</span>
+            <select id="opt-res">
+              <option value="1080" selected>1080p</option>
+              <option value="720">720p</option>
+              <option value="540">540p</option>
+            </select>
+          </label>
+          <label>
+            <span>Frame rate</span>
+            <select id="opt-fps">
+              <option value="60" selected>60 fps</option>
+              <option value="30">30 fps</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          <span>Wi-Fi</span>
+          <select id="opt-net">
+            <option value="weak" selected>Weak or busy (lighter stream, fewer glitches)</option>
+            <option value="strong">Strong (sharpest picture)</option>
+          </select>
+        </label>
+        <button id="btn-play" type="button" class="primary" disabled>Play</button>
+        <p id="pad-note" class="note small"></p>
+        <p class="note small"><a href="/capture.html">Using an HDMI capture card instead?</a></p>
+      </div>
+
+      <!-- Shown while waking / connecting. -->
+      <div id="panel-progress" class="panel" hidden>
+        <div class="spinner" aria-hidden="true"></div>
+        <p id="progress-text" class="note" role="status">Connecting…</p>
+        <button id="btn-cancel" type="button">Cancel</button>
+      </div>
+
+      <!-- Shown when the console asks for its login passcode. -->
+      <form id="panel-pin" class="panel" hidden>
+        <h2>PS5 passcode</h2>
+        <p id="pin-note" class="note">Enter the passcode for your PS5 user.</p>
+        <input id="pin-input" inputmode="numeric" pattern="[0-9]{4,8}" maxlength="8" autocomplete="off" aria-label="Passcode">
+        <button type="submit" class="primary">Continue</button>
+      </form>
+
+      <!-- Shown when the session ends or fails. -->
+      <div id="panel-ended" class="panel" hidden>
+        <h2 id="ended-title">Session ended</h2>
+        <p id="ended-text" class="note"></p>
+        <button id="btn-again" type="button" class="primary">Play again</button>
+      </div>
+
+      <!-- Shown if the browser refuses to start playback without a tap. -->
+      <div id="panel-tap" class="panel" hidden>
+        <button id="btn-tap" type="button" class="primary">Tap to start</button>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

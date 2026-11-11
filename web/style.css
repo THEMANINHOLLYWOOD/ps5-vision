@@ -1,0 +1,266 @@
+:root {
+  --ink: #f4f6fa;
+  --ink-quiet: #a9b1c2;
+  --surface: rgba(28, 32, 42, 0.72);
+  --surface-edge: rgba(255, 255, 255, 0.14);
+  --control: rgba(255, 255, 255, 0.12);
+  --control-hover: rgba(255, 255, 255, 0.2);
+  --accent: #5b8cff;
+  --accent-ink: #06122e;
+  --danger: #ff6b6b;
+  --ok: #56d48f;
+  --radius: 28px;
+  /* Eyes-and-pinch input needs larger targets than a mouse does. */
+  --target: 60px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: #000;
+  color: var(--ink);
+  font: 17px/1.45 system-ui, -apple-system, "SF Pro Text", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #000;
+}
+
+/* No pointer over the game; it comes back with the controls. */
+#stage.playing { cursor: none; }
+#stage.playing:has(#hud:not([hidden])) { cursor: auto; }
+
+#screen {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+[hidden] { display: none !important; }
+
+/* ------------------------------------------------------------ overlay */
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(120% 90% at 50% 0%, #1a2233 0%, #07090d 70%);
+}
+
+/* Once the picture is up, later prompts sit over it instead of hiding it. */
+#overlay:has(#panel-tap:not([hidden])),
+#overlay:has(#panel-pin:not([hidden])) {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.panel {
+  width: min(520px, 100%);
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 20px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--surface-edge);
+  border-radius: var(--radius);
+  -webkit-backdrop-filter: blur(30px);
+  backdrop-filter: blur(30px);
+}
+
+h1, h2 {
+  margin: 0;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+h1 { font-size: 44px; }
+h2 { font-size: 28px; }
+
+.note {
+  margin: 0;
+  color: var(--ink-quiet);
+  text-wrap: pretty;
+}
+.note.small { font-size: 15px; }
+.note a { color: var(--ink); overflow-wrap: anywhere; }
+
+.badge {
+  align-self: center;
+  margin: 0;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: var(--control);
+  color: var(--ink-quiet);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  font-size: 14px;
+  color: var(--ink-quiet);
+}
+
+button, select, input {
+  font: inherit;
+  color: var(--ink);
+  min-height: var(--target);
+  border: 1px solid transparent;
+  border-radius: calc(var(--target) / 2);
+  background: var(--control);
+  padding: 0 24px;
+}
+
+select { appearance: none; -webkit-appearance: none; padding: 0 20px; }
+
+input {
+  text-align: center;
+  font-size: 26px;
+  letter-spacing: 0.3em;
+  font-variant-numeric: tabular-nums;
+}
+
+button { cursor: pointer; font-weight: 600; }
+button:hover:not(:disabled) { background: var(--control-hover); }
+button:disabled { opacity: 0.45; cursor: default; }
+button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 20px;
+}
+button.primary:hover:not(:disabled) { background: #7ba3ff; }
+button.danger { color: var(--danger); }
+
+.spinner {
+  align-self: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 4px solid var(--control);
+  border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2.4s; }
+}
+
+/* ---------------------------------------------------------------- HUD */
+
+#hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
+}
+
+.hud-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+#hud button {
+  background: var(--surface);
+  border-color: var(--surface-edge);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+#hud button:hover { background: rgba(60, 68, 86, 0.85); }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--surface-edge);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.chip-quiet { color: var(--ink-quiet); }
+.chip-quiet:empty { display: none; }
+
+.volume { padding: 4px 16px 4px 6px; gap: 6px; }
+.volume input[type="range"] {
+  width: 140px;
+  min-height: 0;
+  padding: 0;
+  accent-color: var(--accent);
+  background: none;
+}
+#hud .volume button.icon {
+  min-height: 44px;
+  width: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.toast {
+  position: absolute;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 12px 22px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--surface-edge);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  font-weight: 600;
+}
+
+#pad-indicator::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ink-quiet);
+}
+#pad-indicator[data-on="true"]::before { background: var(--ok); }
+
+@media (max-width: 560px) {
+  .panel { padding: 28px 22px; }
+  h1 { font-size: 34px; }
+  .row { grid-template-columns: 1fr; }
+}

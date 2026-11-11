@@ -1,0 +1,12 @@
+# Dependencies and build output
+node_modules/
+.build/
+vendor/
+
+# Your console pairing and this machine's TLS key. Never commit these.
+config/
+
+# Local tooling
+.claude/
+.DS_Store
+*.log

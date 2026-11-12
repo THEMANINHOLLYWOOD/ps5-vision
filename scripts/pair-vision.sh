@@ -26,8 +26,8 @@ find_headset() {
 echo "On the Vision Pro: open Settings > General > Remote Devices and stay there."
 echo "Make sure it is on the same Wi-Fi as this Mac."
 echo
-echo "Looking for the headset (up to 10 minutes)…"
-for _ in $(seq 1 120); do
+echo "Looking for the headset (up to an hour)…"
+for _ in $(seq 1 720); do
   read -r DEVICE STATE <<<"$(find_headset)" || true
   if [[ -n "${DEVICE:-}" ]]; then
     if [[ "$STATE" == "paired" ]]; then

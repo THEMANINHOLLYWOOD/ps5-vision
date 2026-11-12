@@ -1,0 +1,328 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		038B633AEE367D034F3F653C /* LauncherView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A57165E841B18B7471E1536 /* LauncherView.swift */; };
+		2FD4294A846CB8257E0DAA57 /* Bridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10C6B7B6F58406F4C3DBA25 /* Bridge.swift */; };
+		4FCB08B7537C90CE5FECB3EF /* PS5VisionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF96C03F0472B11FBD6619CD /* PS5VisionApp.swift */; };
+		522D7B30FD45F559C7B3AAC9 /* ConsoleSpot.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF87BE522F0FD7BBB06615B1 /* ConsoleSpot.swift */; };
+		7D5E99612F6A9BA16179DCAB /* ScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1913727A8BFA8B20BBFA50C5 /* ScreenView.swift */; };
+		BFB2E85E6DCBB053012BAB5F /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E194D8320ACDB6BF794C59A /* AppModel.swift */; };
+		C2487602DB706DF06E55E649 /* NativeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 671B3DAB99D062349AF14089 /* NativeController.swift */; };
+		C8EA8955818205136D198E10 /* RoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7235B6AF8B261A5E0843216E /* RoomView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		1913727A8BFA8B20BBFA50C5 /* ScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenView.swift; sourceTree = "<group>"; };
+		4A57165E841B18B7471E1536 /* LauncherView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherView.swift; sourceTree = "<group>"; };
+		671B3DAB99D062349AF14089 /* NativeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeController.swift; sourceTree = "<group>"; };
+		7235B6AF8B261A5E0843216E /* RoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomView.swift; sourceTree = "<group>"; };
+		7483E8EC83A1E5AB39FBFB69 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		7C3409294A74788E840370E9 /* PS5Vision.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = PS5Vision.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7E194D8320ACDB6BF794C59A /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		C10C6B7B6F58406F4C3DBA25 /* Bridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bridge.swift; sourceTree = "<group>"; };
+		DF87BE522F0FD7BBB06615B1 /* ConsoleSpot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsoleSpot.swift; sourceTree = "<group>"; };
+		EF96C03F0472B11FBD6619CD /* PS5VisionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PS5VisionApp.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		06BA8F0053ACF9C712AEEF1A /* PS5Vision */ = {
+			isa = PBXGroup;
+			children = (
+				7E194D8320ACDB6BF794C59A /* AppModel.swift */,
+				C10C6B7B6F58406F4C3DBA25 /* Bridge.swift */,
+				DF87BE522F0FD7BBB06615B1 /* ConsoleSpot.swift */,
+				7483E8EC83A1E5AB39FBFB69 /* Info.plist */,
+				4A57165E841B18B7471E1536 /* LauncherView.swift */,
+				671B3DAB99D062349AF14089 /* NativeController.swift */,
+				EF96C03F0472B11FBD6619CD /* PS5VisionApp.swift */,
+				7235B6AF8B261A5E0843216E /* RoomView.swift */,
+				1913727A8BFA8B20BBFA50C5 /* ScreenView.swift */,
+			);
+			path = PS5Vision;
+			sourceTree = "<group>";
+		};
+		6470353A645CBEC70C33817F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				7C3409294A74788E840370E9 /* PS5Vision.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		CFD03C045920678C7B3D8AFC = {
+			isa = PBXGroup;
+			children = (
+				06BA8F0053ACF9C712AEEF1A /* PS5Vision */,
+				6470353A645CBEC70C33817F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		218C4841671A60F46610DB3E /* PS5Vision */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5D0D88B78B4575F2BBDFCB2E /* Build configuration list for PBXNativeTarget "PS5Vision" */;
+			buildPhases = (
+				C53F49119E16F88B02554A27 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PS5Vision;
+			packageProductDependencies = (
+			);
+			productName = PS5Vision;
+			productReference = 7C3409294A74788E840370E9 /* PS5Vision.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0D5EF17128FAA9DCC717B3CC /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					218C4841671A60F46610DB3E = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = F67CE54E63D63742388A74A7 /* Build configuration list for PBXProject "PS5Vision" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = CFD03C045920678C7B3D8AFC;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 6470353A645CBEC70C33817F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				218C4841671A60F46610DB3E /* PS5Vision */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C53F49119E16F88B02554A27 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BFB2E85E6DCBB053012BAB5F /* AppModel.swift in Sources */,
+				2FD4294A846CB8257E0DAA57 /* Bridge.swift in Sources */,
+				522D7B30FD45F559C7B3AAC9 /* ConsoleSpot.swift in Sources */,
+				038B633AEE367D034F3F653C /* LauncherView.swift in Sources */,
+				C2487602DB706DF06E55E649 /* NativeController.swift in Sources */,
+				4FCB08B7537C90CE5FECB3EF /* PS5VisionApp.swift in Sources */,
+				C8EA8955818205136D198E10 /* RoomView.swift in Sources */,
+				7D5E99612F6A9BA16179DCAB /* ScreenView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		0B9DA15CEB38C8BCF5A9C27D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PS5Vision/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.ps5vision.app;
+				PRODUCT_NAME = "PS5 Vision";
+				SDKROOT = xros;
+				TARGETED_DEVICE_FAMILY = 7;
+			};
+			name = Release;
+		};
+		206FB3641C3505108E1D3F4B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = xros;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+				XROS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		B8752A89584CBA6CE64AC990 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = xros;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+				XROS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		E54E311E97F5497E0AA00DC3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PS5Vision/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.ps5vision.app;
+				PRODUCT_NAME = "PS5 Vision";
+				SDKROOT = xros;
+				TARGETED_DEVICE_FAMILY = 7;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		5D0D88B78B4575F2BBDFCB2E /* Build configuration list for PBXNativeTarget "PS5Vision" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E54E311E97F5497E0AA00DC3 /* Debug */,
+				0B9DA15CEB38C8BCF5A9C27D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F67CE54E63D63742388A74A7 /* Build configuration list for PBXProject "PS5Vision" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				206FB3641C3505108E1D3F4B /* Debug */,
+				B8752A89584CBA6CE64AC990 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 0D5EF17128FAA9DCC717B3CC /* Project object */;
+}

@@ -31,6 +31,7 @@
     "mac": "node server/index.js --local --open",
     "demo": "node server/index.js --demo",
     "link": "node server/link.js",
+    "vision": "open visionos/PS5Vision.xcodeproj",
     "test": "node --test server/*.test.js"
   },
   "dependencies": {

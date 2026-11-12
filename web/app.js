@@ -59,6 +59,13 @@ const NATIVE_INPUT_STALE_MS = 500;
 const MIN_PRESS_MS = 60;
 const pressedAt = new Map(); // key code or pad button -> when it went down
 
+// Opened by the Vision Pro app (?app=1): it reads the controller itself, and
+// pinching Connect over the PS5 already said "play".
+const IN_APP = new URLSearchParams(location.search).has('app');
+const nativeBridge = () => window.webkit?.messageHandlers?.ps5;
+let autoPlayed = false;
+if (IN_APP) document.documentElement.classList.add('in-app');
+
 const AUTO_REFRESH_AFTER_S = 4;          // seconds without a new frame
 const AUTO_REFRESH_MIN_GAP_MS = 15_000;  // don't loop if the network is down
 
@@ -177,6 +184,10 @@ async function loadStatus() {
       ? 'Plays a test pattern with a beep, to check picture, sound and controller without a console.'
       : status.streaming ? 'A session is already running. Play to pick it up.' : 'Ready.';
     play.disabled = false;
+    if (IN_APP && !autoPlayed && !$('panel-start').hidden) {
+      autoPlayed = true;
+      play.click(); // \`play\` here is the Play button
+    }
   }
 
   updatePadNote();
@@ -705,6 +716,7 @@ function tapVirtual(bit) {
 }
 
 function rumble(left, right) {
+  nativeBridge()?.postMessage({ type: 'rumble', left, right });
   const actuator = activeGamepad()?.vibrationActuator;
   if (!actuator?.playEffect) return;
   if (!left && !right) {

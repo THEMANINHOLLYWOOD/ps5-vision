@@ -334,3 +334,8 @@ button.danger { color: var(--danger); }
   h1 { font-size: 34px; }
   .row { grid-template-columns: 1fr; }
 }
+
+/* Inside the Vision Pro app: the window is the screen, and the app reads the
+   controller, so browser-only controls are left out. */
+.in-app #btn-fullscreen,
+.in-app #panel-start .note.small:last-child { display: none; }

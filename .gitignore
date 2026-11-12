@@ -6,6 +6,10 @@ vendor/
 # Your console pairing and this machine's TLS key. Never commit these.
 config/
 
+# Xcode's per-person files
+xcuserdata/
+*.xcuserstate
+
 # Local tooling
 .claude/
 .DS_Store

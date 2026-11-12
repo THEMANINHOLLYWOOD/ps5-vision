@@ -6,6 +6,7 @@ import { AccessUnitSplitter, hasParameterSets, isKeyframe, nalTypes } from './h2
 import { OggOpusReader } from './ogg.js';
 import { broadcastAddresses, findLinkedConsole, locateConsole, parseDiscoveryResponse, wakeCredential } from './discovery.js';
 import { describeQuit, normalizeOptions } from './bridge.js';
+import { txtRecord } from './bonjour.js';
 import { BUTTON, encodeState, idleState, readGamepad, statesEqual } from '../web/controller.js';
 import { KEY_GUIDE, KEY_MAP, isMappedKey, keyboardState, mergeStates } from '../web/keyboard.js';
 
@@ -388,4 +389,10 @@ test('inputs combine: buttons add up, sticks follow the furthest push', () => {
   assert.equal(merged.lx, -32767);
   assert.equal(merged.r2, 255);
   assert.deepEqual(mergeStates(), idleState());
+});
+
+test('Bonjour TXT entries are printable key=value strings that fit', () => {
+  assert.deepEqual(txtRecord({ scheme: 'https', console: 'PS5-287', empty: '', gone: undefined }), ['scheme=https', 'console=PS5-287']);
+  assert.equal(txtRecord({ name: 'Café\n' })[0], 'name=Caf');
+  assert.equal(txtRecord({ long: 'x'.repeat(400) })[0].length, 255);
 });

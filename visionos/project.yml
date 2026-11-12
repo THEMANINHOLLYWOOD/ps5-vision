@@ -1,0 +1,31 @@
+# Generates PS5Vision.xcodeproj: run `xcodegen` in this folder (brew install xcodegen),
+# or just `npm run vision` from the project root.
+name: PS5Vision
+options:
+  bundleIdPrefix: io.github.ps5vision
+  deploymentTarget:
+    visionOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    CODE_SIGN_STYLE: Automatic
+    # Set your own team in Xcode (Signing & Capabilities) to run on a headset.
+    DEVELOPMENT_TEAM: ""
+targets:
+  PS5Vision:
+    type: application
+    platform: visionOS
+    sources:
+      - path: PS5Vision
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.ps5vision.app
+        PRODUCT_NAME: PS5 Vision
+        INFOPLIST_FILE: PS5Vision/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "7"
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"

@@ -27,7 +27,8 @@ Not affiliated with or endorsed by Sony Interactive Entertainment.
   Edge or Firefox on anything else on the same network.
 - **A controller paired to the device you play on**, not to the PS5. For a
   DualSense: hold **Create + PS** until the light bar flashes, then pick it in
-  that device's Bluetooth settings.
+  that device's Bluetooth settings. On a laptop you can also play with the
+  keyboard, or click an on-screen controller.
 
 > The PS5 ends a Remote Play session as soon as a controller connected to the
 > console itself is switched on. That is the console's rule, so the controller
@@ -88,10 +89,31 @@ Tap or click the picture to bring up the controls:
 | Fullscreen | Fills the screen. |
 | Rest mode | Ends the session and puts the PS5 to sleep. |
 | End | Ends the session and leaves the PS5 on. |
+| Buttons | Shows a controller you can click or tap, for when there is no real one. |
+| Keys | Lists the keyboard controls (or press **?**). |
 
 The start screen lets you pick resolution (up to 1080p), frame rate, and
 whether your Wi-Fi is strong or weak. "Weak" sends a lighter stream that
 glitches less.
+
+### Playing from a laptop
+
+No controller needed. While the picture is up, the keyboard is the controller:
+
+| Keys | Controller |
+| --- | --- |
+| Arrow keys | D-pad (move around the PS5's menus) |
+| Enter, Space or K | ✕ (select) |
+| Backspace, Esc or L | ○ (back) |
+| J / I | □ / △ |
+| W A S D | Left stick |
+| T F G H | Right stick |
+| Q / E, Z / C | L1 / R1, L2 / R2 |
+| Left Shift / V | L3 / R3 |
+| O, U, P, Y | Options, Create, PS button, touchpad press |
+
+Or press **Buttons** for a controller you can click; each button stays down
+for as long as you hold it. A real controller works at the same time.
 
 ### Other ways to run it
 
@@ -114,6 +136,43 @@ The page also has a link for viewing an **HDMI capture card** plugged into the
 device you are playing on, as a lower-latency alternative that does not use
 Remote Play at all.
 
+## The Vision Pro app
+
+There is also a native app for Vision Pro in [`visionos/`](visionos). It plays
+the same stream, and adds what a web page can't:
+
+- **Look at your PS5 to connect.** Like connecting to a Mac, a Connect button
+  appears over your real PS5 when you look at it; pinch it and the screen
+  opens. The room around you stays exactly as it is.
+- **A screen you can size.** Drag the corner, or pick Small, Standard, Large or
+  Cinema under it. It always keeps the TV's shape.
+- **The controller, fully.** The app reads the DualSense itself, so the PS
+  button works and rumble reaches your hands.
+- **No address or certificate warning.** It finds the bridge on your network
+  by itself and trusts only that bridge's own certificate.
+
+To put it on your headset you need a Mac with Xcode and a free Apple account:
+
+1. `npm run vision` opens the project in Xcode.
+2. In Xcode, click the PS5Vision project > Signing & Capabilities > pick your
+   Team (add your Apple account if none is listed).
+3. Turn on Developer Mode on the headset (Settings > Privacy & Security), pick
+   it as the run destination in Xcode, and press Run.
+
+Then, with `npm start` running on the Mac: open PS5 Vision, choose **Show the
+app where your PS5 is**, drag the blue ring onto the console and press Done.
+From then on, opening the app and looking at the PS5 is all it takes. Allow
+Local Network access when asked, or the app can't find the bridge.
+
+`ps5vision://connect` opens the screen straight away, for example from a
+Shortcut. The project is generated from `visionos/project.yml` with
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) if you change its settings.
+
+Optional: a scanned model of your console makes the app find it by sight
+instead of by the spot you showed it. Make one with Create ML's Object
+Tracking template from a 3D scan of the PS5 (Reality Composer on an iPhone
+can make the scan), and add the resulting `.referenceobject` file to the app.
+
 ## If something is off
 
 | What you see | What to do |
@@ -126,7 +185,8 @@ Remote Play at all.
 | "Another device is already using Remote Play" | Close the PS Remote Play app or Chiaki wherever it is running. |
 | "The PS5 system software is newer than this bridge understands" | A PS5 update changed Remote Play. Raise `CHIAKI_TAG` in `scripts/setup.sh` to the newest chiaki-ng release, delete `vendor/` and `.build/`, and run `npm run setup` again. |
 | Stutter, blocky picture, or lag | See below. |
-| The PS button on the controller opens something on your device | Use the on-screen PS button. |
+| The PS button on the controller opens something on your device | Use the on-screen PS button, the P key, or the Vision Pro app. |
+| The Vision Pro app says it is looking for the bridge | Check `npm start` is running, then allow Local Network for PS5 Vision in the headset's Settings > Apps. Or type the address under Bridge address. |
 
 ### Making it smooth
 
@@ -169,6 +229,10 @@ that being on the Wi-Fi is not enough to take over the console:
   which is always encrypted. The `https://` page uses a certificate made on
   your Mac, which is why browsers warn about it once.
 - **Private mode.** `npm run mac` listens only on the Mac itself.
+- **Announced, not exposed.** The bridge announces itself on your network with
+  Bonjour so the Vision Pro app can find it. The announcement holds its
+  address, port, console name and certificate fingerprint; nothing secret.
+  Private mode doesn't announce.
 
 Things to keep in mind:
 
@@ -187,6 +251,8 @@ Things to keep in mind:
 - `server/` The bridge, in Node.js: runs the helper, serves the page, and
   speaks WebRTC with [node-datachannel](https://github.com/murat-dogan/node-datachannel).
 - `web/` The page you play in. Plain HTML, CSS and JavaScript, no build step.
+- `visionos/` The Vision Pro app (SwiftUI, RealityKit, ARKit). It shows the
+  same page and adds the room, the controller and the screen sizes.
 - `scripts/setup.sh` Fetches and builds chiaki-ng and the helper.
 
 `npm test` runs the unit tests. Video is never re-encoded: the PS5's H.264

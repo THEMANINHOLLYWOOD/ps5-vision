@@ -21,6 +21,8 @@ import { Bridge } from './bridge.js';
 import { AttemptLimiter, codesMatch, hostAllowed, isLoopback, loadOrCreateAccessCode } from './access.js';
 import { ROOT, CONFIG_DIR, HELPER_PATH, loadConsole, saveConsole } from './config.js';
 import { bonjourName, ensureCertificate, localAddresses } from './tls.js';
+import { advertise } from './bonjour.js';
+import { X509Certificate } from 'node:crypto';
 
 const WEB_DIR = path.join(ROOT, 'web');
 const STATIC_FILES = {
@@ -262,7 +264,25 @@ async function main() {
   console.log('');
   if (args.open) execFile('open', [localUrl], () => {});
 
+  // Lets the Vision Pro app find this bridge by itself. It is told the
+  // certificate's fingerprint, so it can trust exactly this certificate
+  // instead of any that a device on the network might present.
+  const withdraw = args.local ? () => {} : advertise({
+    name: `PS5 Vision on ${(hostName ?? 'this Mac').replace(/\.local$/i, '')}`,
+    port: tls ? args.httpsPort : args.port,
+    txt: {
+      scheme: tls ? 'https' : 'http',
+      host: hostName ?? addresses[0],
+      port: tls ? args.httpsPort : args.port,
+      path: '/',
+      console: args.demo ? 'Test pattern' : target?.name,
+      sha256: tls ? new X509Certificate(tls.cert).fingerprint256.replace(/:/g, '').toLowerCase() : undefined,
+    },
+    log,
+  });
+
   const shutdown = () => {
+    withdraw();
     bridge.shutdown();
     for (const server of servers) server.close();
     // Give the helper a moment to say goodbye to the console.

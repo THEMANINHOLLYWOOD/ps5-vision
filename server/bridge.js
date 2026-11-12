@@ -5,6 +5,7 @@
 import { Viewer } from './viewer.js';
 import { CONTROLLER_STATE_SIZE, ConsoleSource, DemoSource } from './source.js';
 import { discover, locateConsole, wakeup } from './discovery.js';
+import { keepAwake } from './awake.js';
 
 const RESOLUTIONS = [360, 540, 720, 1080];
 const IDLE_STOP_MS = 10_000;
@@ -113,6 +114,7 @@ export class Bridge {
   }
 
   shutdown() {
+    this.letSleep?.();
     clearInterval(this.statsTimer);
     clearTimeout(this.idleTimer);
     this.viewer?.close();
@@ -275,6 +277,8 @@ export class Bridge {
       this.source = null;
       this.sourceOptions = null;
       this.sourceConnected = false;
+      this.letSleep?.();
+      this.letSleep = null;
       this.log(`source ended (code ${code}, signal ${signal})`);
       if (!this.sourceQuitReported) {
         this.viewer?.sendControl({
@@ -287,6 +291,8 @@ export class Bridge {
       }
     });
     this.log(this.demo ? 'starting test pattern' : `connecting to ${this.console.name} at ${this.console.host}`);
+    this.letSleep?.();
+    this.letSleep = keepAwake(); // until this session ends
     source.start();
   }
 

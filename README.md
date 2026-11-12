@@ -96,6 +96,20 @@ The start screen lets you pick resolution (up to 1080p), frame rate, and
 whether your Wi-Fi is strong or weak. "Weak" sends a lighter stream that
 glitches less.
 
+### Start it automatically
+
+```bash
+npm run autostart
+```
+
+Runs the bridge in the background whenever you're logged in to the Mac, so you
+never need a Terminal window. `npm run autostart -- status` shows the address
+and access code; `npm run autostart -- off` turns it off. The first time,
+allow node to find devices on your local network if macOS asks.
+
+While a game is streaming, the bridge keeps the Mac from falling asleep (you
+aren't touching it while you play), and lets it sleep again afterwards.
+
 ### Playing from a laptop
 
 No controller needed. While the picture is up, the keyboard is the controller:

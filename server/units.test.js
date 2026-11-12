@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { FrameParser, encodeFrame } from './framing.js';
 import { AccessUnitSplitter, hasParameterSets, isKeyframe, nalTypes } from './h264.js';
 import { OggOpusReader } from './ogg.js';
-import { broadcastAddresses, parseDiscoveryResponse, wakeCredential } from './discovery.js';
+import { broadcastAddresses, findLinkedConsole, locateConsole, parseDiscoveryResponse, wakeCredential } from './discovery.js';
 import { describeQuit, normalizeOptions } from './bridge.js';
 import { BUTTON, encodeState, idleState, readGamepad, statesEqual } from '../web/controller.js';
 
@@ -307,4 +307,52 @@ test('a frame parser that saw a corrupt length ignores everything after it', asy
   assert.throws(() => parser.push(encodeFrame('B', Buffer.alloc(9))));
   parser.push(encodeFrame('C', Buffer.from('ok')));
   assert.deepEqual(seen, ['A']);
+});
+
+// ---------------------------------------------------------------- finding the console again
+
+const linked = { host: '192.168.5.20', name: 'PS5-123', mac: 'c0151b35d0b1' };
+const reply = (address, id, name = 'PS5-123') => ({ address, id, name, state: 'standby' });
+
+test('the linked console is recognised by its hardware address, whatever its name or IP', () => {
+  const replies = [reply('192.168.5.30', 'AABBCCDDEEFF'), reply('192.168.5.31', 'C0151B35D0B1', 'Renamed')];
+  assert.equal(findLinkedConsole(replies, linked).address, '192.168.5.31');
+  assert.equal(findLinkedConsole([reply('192.168.5.30', 'AABBCCDDEEFF')], linked), null);
+});
+
+test('without a saved hardware address, a unique name is enough', () => {
+  const noMac = { ...linked, mac: '' };
+  assert.equal(findLinkedConsole([reply('192.168.5.30', 'X')], noMac).address, '192.168.5.30');
+  assert.equal(findLinkedConsole([reply('192.168.5.30', 'X'), reply('192.168.5.31', 'Y')], noMac), null);
+});
+
+// A pretend network: what answers at one address, and what answers a broadcast.
+const network = (atHost, everywhere) => async ({ host }) => (host ? atHost : everywhere);
+
+test('a console still at its saved address is used without asking the whole network', async () => {
+  let broadcasts = 0;
+  const ask = async ({ host }) => (host ? [reply(linked.host, 'C0151B35D0B1')] : (broadcasts++, []));
+  const found = await locateConsole(linked, { ask });
+  assert.equal(found.reply.address, linked.host);
+  assert.equal(found.moved, false);
+  assert.equal(broadcasts, 0);
+});
+
+test('a console that got a new address is found there', async () => {
+  const found = await locateConsole(linked, { ask: network([], [reply('192.168.5.44', 'C0151B35D0B1')]) });
+  assert.equal(found.reply.address, '192.168.5.44');
+  assert.equal(found.moved, true);
+});
+
+test('another device at the saved address is not mistaken for the console', async () => {
+  const other = [reply(linked.host, 'AABBCCDDEEFF', 'PS5-999')];
+  assert.equal((await locateConsole(linked, { ask: network(other, [...other, reply('192.168.5.44', 'C0151B35D0B1')]) })).reply.address, '192.168.5.44');
+  const nowhere = await locateConsole(linked, { ask: network(other, other) });
+  assert.equal(nowhere.reply, null);
+  assert.equal(nowhere.otherDevice, true);
+});
+
+test('no answer anywhere leaves the saved address to be tried directly', async () => {
+  const found = await locateConsole(linked, { ask: network([], []) });
+  assert.deepEqual(found, { reply: null, moved: false, otherDevice: false });
 });

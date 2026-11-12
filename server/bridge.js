@@ -4,7 +4,7 @@
 
 import { Viewer } from './viewer.js';
 import { CONTROLLER_STATE_SIZE, ConsoleSource, DemoSource } from './source.js';
-import { discover, wakeup } from './discovery.js';
+import { discover, locateConsole, wakeup } from './discovery.js';
 
 const RESOLUTIONS = [360, 540, 720, 1080];
 const IDLE_STOP_MS = 10_000;
@@ -38,9 +38,10 @@ export function normalizeOptions(raw = {}) {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class Bridge {
-  constructor({ demo = false, console: target = null, helperPath, verbose = false, log = () => {} }) {
+  constructor({ demo = false, console: target = null, helperPath, verbose = false, log = () => {}, onConsoleMoved = () => {} }) {
     this.demo = demo;
     this.console = target;
+    this.onConsoleMoved = onConsoleMoved;
     this.helperPath = helperPath;
     this.verbose = verbose;
     this.log = log;
@@ -336,9 +337,12 @@ export class Bridge {
   // Finds the console and, if it is in rest mode, wakes it and waits.
   // Returns true once it should accept a connection.
   async #ensureAwake(viewer, current) {
-    const host = this.console.host;
-    let found = (await discover({ host, timeoutMs: 1500 }))[0];
+    const located = await locateConsole(this.console);
     if (!current()) return false;
+    if (located.moved) this.#consoleMoved(located.reply);
+    if (located.otherDevice) this.log(`the device at ${this.console.host} is not ${this.console.name}`);
+    const host = this.console.host;
+    let found = located.reply;
     if (found?.state === 'ready') return true;
     if (!found) {
       // No reply at all. macOS may be blocking local-network access, or the
@@ -363,5 +367,19 @@ export class Bridge {
       }
     }
     return false;
+  }
+
+  #consoleMoved(reply) {
+    this.log(`${this.console.name} moved from ${this.console.host} to ${reply.address}`);
+    this.console = {
+      ...this.console,
+      host: reply.address,
+      mac: this.console.mac || reply.id.replace(/[^0-9a-f]/gi, '').toLowerCase(),
+    };
+    try {
+      this.onConsoleMoved(this.console);
+    } catch (err) {
+      this.log(`could not save the new address: ${err.message}`);
+    }
   }
 }

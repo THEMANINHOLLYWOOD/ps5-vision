@@ -94,6 +94,30 @@ export function discover({ host, timeoutMs = 1500 } = {}) {
   });
 }
 
+// Picks the linked console out of discovery replies. The PS5 reports its
+// network hardware address as host-id, which, unlike its IP address, never
+// changes. Consoles linked before the address was saved fall back to the name,
+// but only if exactly one console has it.
+export function findLinkedConsole(replies, linked) {
+  const clean = (id) => String(id ?? '').replace(/[^0-9a-f]/gi, '').toLowerCase();
+  const id = clean(linked.mac);
+  if (id) return replies.find((reply) => clean(reply.id) === id) ?? null;
+  const named = replies.filter((reply) => reply.name && reply.name === linked.name);
+  return named.length === 1 ? named[0] : null;
+}
+
+// Finds the linked console: first at its saved address, then, if that is
+// silent or answered by a different device (the router gave the PS5 a new
+// address), anywhere on the network. Resolves with the console's reply, or
+// null, and whether it was found somewhere new. `ask` is for tests.
+export async function locateConsole(linked, { ask = discover } = {}) {
+  const atSaved = (await ask({ host: linked.host, timeoutMs: 1500 }))[0] ?? null;
+  if (atSaved && (!linked.mac || findLinkedConsole([atSaved], linked))) return { reply: atSaved, moved: false };
+  const elsewhere = findLinkedConsole(await ask({ timeoutMs: 2000 }), linked);
+  if (elsewhere) return { reply: elsewhere, moved: elsewhere.address !== linked.host };
+  return { reply: null, moved: false, otherDevice: Boolean(atSaved) };
+}
+
 // Wakes a console from rest mode. It only works if the console is plugged in,
 // in rest mode, and has "Enable turning on PS5 from network" switched on.
 export function wakeup(host, registKeyHex, { ps5 = true } = {}) {

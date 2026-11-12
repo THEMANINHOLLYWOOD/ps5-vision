@@ -19,7 +19,7 @@ import https from 'node:https';
 import path from 'node:path';
 import { Bridge } from './bridge.js';
 import { AttemptLimiter, codesMatch, hostAllowed, isLoopback, loadOrCreateAccessCode } from './access.js';
-import { ROOT, CONFIG_DIR, HELPER_PATH, loadConsole } from './config.js';
+import { ROOT, CONFIG_DIR, HELPER_PATH, loadConsole, saveConsole } from './config.js';
 import { bonjourName, ensureCertificate, localAddresses } from './tls.js';
 
 const WEB_DIR = path.join(ROOT, 'web');
@@ -203,7 +203,10 @@ function listen(server, port, host) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const target = args.demo ? null : loadConsole();
-  const bridge = new Bridge({ demo: args.demo, console: target, helperPath: HELPER_PATH, verbose: args.verbose, log });
+  const bridge = new Bridge({
+    demo: args.demo, console: target, helperPath: HELPER_PATH, verbose: args.verbose, log,
+    onConsoleMoved: (moved) => saveConsole(moved), // so the next start looks in the right place first
+  });
 
   // Local mode listens on the loopback address only: nothing else on the
   // network can open the page or control the console. localhost also counts

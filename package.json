@@ -33,6 +33,7 @@
     "link": "node server/link.js",
     "autostart": "bash scripts/autostart.sh",
     "vision": "open visionos/PS5Vision.xcodeproj",
+    "vision:install": "bash scripts/install-vision.sh",
     "test": "node --test server/*.test.js"
   },
   "dependencies": {

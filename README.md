@@ -165,13 +165,24 @@ the same stream, and adds what a web page can't:
 - **No address or certificate warning.** It finds the bridge on your network
   by itself and trusts only that bridge's own certificate.
 
-To put it on your headset you need a Mac with Xcode and a free Apple account:
+To put it on your headset you need a Mac with Xcode and a free Apple account.
+Once:
 
-1. `npm run vision` opens the project in Xcode.
-2. In Xcode, click the PS5Vision project > Signing & Capabilities > pick your
-   Team (add your Apple account if none is listed).
-3. Turn on Developer Mode on the headset (Settings > Privacy & Security), pick
-   it as the run destination in Xcode, and press Run.
+1. In Xcode, Settings > Accounts: add your Apple account.
+2. Pair the headset: on it, open Settings > General > Remote Devices; on the
+   Mac, open Xcode > Window > Devices and Simulators, click the headset, click
+   Pair and type the code it shows. Turn on Developer Mode if it asks.
+
+Then:
+
+```bash
+npm run vision:install
+```
+
+It builds the app, signs it with your account, installs it and opens it on
+the headset. (Or open it in Xcode with `npm run vision` and press Run.) The
+first time, the headset may ask you to trust your developer account under
+Settings > General > VPN & Device Management.
 
 Then, with `npm start` running on the Mac: open PS5 Vision, choose **Show the
 app where your PS5 is**, drag the blue ring onto the console and press Done.

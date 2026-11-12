@@ -2,6 +2,7 @@
 // WebRTC and sends controller input back.
 
 import { BUTTON, encodeState, idleState, readGamepad, statesEqual } from './controller.js';
+import { KEY_GUIDE, isMappedKey, keyboardState, mergeStates } from './keyboard.js';
 
 const $ = (id) => document.getElementById(id);
 const video = $('screen');
@@ -45,6 +46,18 @@ let toastTimer = null;
 let audioCtx = null;
 let gainNode = null;
 let audioSource = null;
+// Other ways to press buttons than a controller: keys held down, buttons held
+// on the on-screen controller, and a controller read by the Vision Pro app.
+const heldKeys = new Set();
+let padState = idleState();
+let keyboardUsed = false;
+let nativeState = null;
+let nativeStateAt = 0;
+const NATIVE_INPUT_STALE_MS = 500;
+// A click or key tap can be over in a few milliseconds, between two reads of
+// the input. Each press counts for at least this long, so none are lost.
+const MIN_PRESS_MS = 60;
+const pressedAt = new Map(); // key code or pad button -> when it went down
 
 const AUTO_REFRESH_AFTER_S = 4;          // seconds without a new frame
 const AUTO_REFRESH_MIN_GAP_MS = 15_000;  // don't loop if the network is down
@@ -173,16 +186,16 @@ function updatePadNote() {
   const status = statusCache ?? {};
   const padNote = $('pad-note');
   if (gamepadsAvailable()) {
-    padNote.textContent = 'Controller: pair it with this device over Bluetooth (not with the PS5: the PS5 ends Remote Play when its own controller turns on), then press any button once playing.';
+    padNote.textContent = 'Controller: pair it with this device over Bluetooth (not with the PS5: the PS5 ends Remote Play when its own controller turns on), then press any button once playing. No controller? The keyboard works too (press ? while playing), and Buttons shows one you can click.';
   } else if (status.secureUrl) {
     padNote.innerHTML = '';
     padNote.append('This browser only allows controllers on a secure page. Open ');
     const link = document.createElement('a');
     link.href = status.secureUrl;
     link.textContent = status.secureUrl;
-    padNote.append(link, ' instead.');
+    padNote.append(link, ' instead. The keyboard and the on-screen Buttons work on this page too.');
   } else {
-    padNote.textContent = 'This browser does not expose game controllers to this page.';
+    padNote.textContent = 'This browser does not share game controllers with pages. Play with the keyboard (press ? while playing) or the on-screen Buttons.';
   }
 }
 
@@ -428,6 +441,7 @@ function onControl(connection, raw) {
         streaming = true;
         $('stage').classList.add('playing');
         showPanel($('panel-tap').hidden ? null : 'panel-tap');
+        updatePad();
         showHud();
       } else if (PROGRESS_TEXT[message.state]) {
         showProgress(PROGRESS_TEXT[message.state]);
@@ -478,6 +492,8 @@ function teardown() {
   stalledSamples = 0;
   frozenSamples = 0;
   virtualButtons = 0;
+  releaseAllInput();
+  updatePad();
   lastSent = idleState();
   $('stats').textContent = '';
   if (pc) {
@@ -508,24 +524,29 @@ function activeGamepad() {
 
 // Why no controller is visible, in words the player can act on.
 function padProblem() {
-  if (!window.isSecureContext) return 'No controller: open the https:// address (browsers hide controllers from http pages)';
-  if (!gamepadsAvailable()) return 'No controller: this browser does not share controllers with pages';
-  return 'No controller seen yet: press any button on it';
+  if (!window.isSecureContext) return 'Keyboard only: open the https:// address to use a controller';
+  if (!gamepadsAvailable()) return 'Keyboard only: this browser does not share controllers with pages';
+  return 'No controller seen yet: press a button on it, or use the keyboard (?)';
+}
+
+function nativeInput(now) {
+  return nativeState && now - nativeStateAt < NATIVE_INPUT_STALE_MS ? nativeState : null;
 }
 
 function pollController() {
   const gamepad = activeGamepad();
+  const now = performance.now();
+  const native = nativeInput(now);
   const indicator = $('pad-indicator');
-  const label = gamepad ? 'Controller connected' : padProblem();
+  const label = gamepad || native ? 'Controller connected' : keyboardUsed ? 'Keyboard (press ? for keys)' : padProblem();
   if (indicator.textContent !== label) {
-    indicator.dataset.on = String(Boolean(gamepad));
+    indicator.dataset.on = String(Boolean(gamepad || native || keyboardUsed));
     indicator.textContent = label;
     showHud();
   }
   if (inputChannel?.readyState !== 'open') return;
 
-  const state = readGamepad(gamepad, virtualButtons);
-  const now = performance.now();
+  const state = mergeStates(readGamepad(gamepad, virtualButtons), keyboardState(heldKeys), padState, native);
   if (statesEqual(state, lastSent) && now - lastSentAt < RESEND_INTERVAL_MS) return;
   inputChannel.send(encodeState(state));
   lastSent = state;
@@ -548,6 +569,134 @@ function sendDiag() {
     pressed: pad ? pad.buttons.filter((button) => button.pressed).length : 0,
   });
 }
+
+// ---------------------------------------------------- keyboard and on-screen
+
+// While playing, the keyboard is a controller. Keys still do their usual job
+// in text fields, and Enter or Space on a focused control presses that control.
+function onKeyDown(event) {
+  const guideOpen = !$('keys').hidden;
+  if (event.key === '?' || (guideOpen && event.code === 'Escape')) {
+    if (streaming || guideOpen) {
+      event.preventDefault();
+      toggleKeyGuide();
+    }
+    return;
+  }
+  if (!streaming || event.metaKey || event.ctrlKey || event.altKey) return;
+  const target = event.target instanceof Element ? event.target : null;
+  if (target?.closest('input, select, textarea')) return;
+  const activates = ['Enter', 'NumpadEnter', 'Space'].includes(event.code);
+  if (!isMappedKey(event.code) || (activates && target?.closest('button, a'))) {
+    showHud(); // e.g. Tab: so the controls are reachable without a pointer
+    return;
+  }
+  event.preventDefault();
+  if (!event.repeat) pressedAt.set(event.code, performance.now());
+  heldKeys.add(event.code);
+  if (!keyboardUsed) keyboardUsed = true;
+}
+
+function onKeyUp(event) {
+  if (!heldKeys.has(event.code)) return;
+  event.preventDefault();
+  afterMinimumPress(event.code, () => heldKeys.delete(event.code));
+}
+
+// Releases once the press has lasted MIN_PRESS_MS, unless it was pressed
+// again in the meantime.
+function afterMinimumPress(what, release) {
+  const at = pressedAt.get(what);
+  const left = MIN_PRESS_MS - (performance.now() - (at ?? 0));
+  if (left <= 0) release();
+  else setTimeout(() => { if (pressedAt.get(what) === at) release(); }, left);
+}
+
+function releaseAllInput() {
+  heldKeys.clear();
+  pressedAt.clear();
+  padState = idleState();
+  for (const button of document.querySelectorAll('#pad .held')) button.classList.remove('held');
+}
+
+function toggleKeyGuide() {
+  const guide = $('keys');
+  guide.hidden = !guide.hidden;
+  releaseAllInput(); // Shift (for ?) is also L3; don't leave it held
+  if (!guide.hidden) $('btn-keys-close').focus({ preventScroll: true });
+  else document.activeElement?.blur?.();
+}
+
+let padWanted = false;
+try { padWanted = localStorage.getItem('pad') === '1'; } catch { /* not remembered */ }
+
+function updatePad() {
+  $('pad').hidden = !(streaming && padWanted);
+  $('btn-pad').setAttribute('aria-pressed', String(padWanted));
+}
+
+function togglePad() {
+  padWanted = !padWanted;
+  try { localStorage.setItem('pad', padWanted ? '1' : '0'); } catch { /* not remembered */ }
+  if (!padWanted) releaseAllInput();
+  updatePad();
+}
+
+// The on-screen controller's buttons stay down for as long as they are held,
+// so they work for menus and games alike. Several can be held at once.
+function setPadButton(element, down) {
+  element.classList.toggle('held', down);
+  const bit = BUTTON[element.dataset.button];
+  const trigger = element.dataset.trigger;
+  padState = { ...padState };
+  if (bit) padState.buttons = down ? padState.buttons | bit : padState.buttons & ~bit;
+  if (trigger) padState[trigger] = down ? 255 : 0;
+}
+
+function wirePad() {
+  for (const element of document.querySelectorAll('#pad button')) {
+    element.addEventListener('pointerdown', (event) => {
+      event.preventDefault(); // keeps focus (and the keyboard) on the game
+      pressedAt.set(element, performance.now());
+      setPadButton(element, true);
+      // Keeps the button held if the finger slides off it a little.
+      try { element.setPointerCapture(event.pointerId); } catch { /* released on pointerup instead */ }
+    });
+    const release = () => {
+      if (!element.classList.contains('held')) return;
+      afterMinimumPress(element, () => { if (element.classList.contains('held')) setPadButton(element, false); });
+    };
+    element.addEventListener('pointerup', release);
+    element.addEventListener('pointercancel', release);
+    element.addEventListener('lostpointercapture', release);
+    element.addEventListener('contextmenu', (event) => event.preventDefault());
+  }
+}
+
+function fillKeyGuide() {
+  const table = $('keys-table');
+  for (const [keys, action] of KEY_GUIDE) {
+    const row = table.insertRow();
+    row.insertCell().textContent = keys;
+    row.insertCell().textContent = action;
+  }
+}
+
+// The Vision Pro app reads the controller itself and hands it to the page.
+window.ps5NativeInput = (state) => {
+  if (!state || typeof state !== 'object') return;
+  const int = (value, low, high) => Math.max(low, Math.min(high, Math.round(Number(value) || 0)));
+  nativeState = {
+    buttons: int(state.buttons, 0, 0xffff),
+    l2: int(state.l2, 0, 255),
+    r2: int(state.r2, 0, 255),
+    lx: int(state.lx, -32767, 32767),
+    ly: int(state.ly, -32767, 32767),
+    rx: int(state.rx, -32767, 32767),
+    ry: int(state.ry, -32767, 32767),
+  };
+  nativeStateAt = performance.now();
+};
 
 // Presses an on-screen button briefly, as a tap on a real one would.
 function tapVirtual(bit) {
@@ -671,6 +820,16 @@ $('btn-rest').addEventListener('click', () => stopSession(true));
 $('btn-ps').addEventListener('click', () => tapVirtual(BUTTON.PS));
 $('btn-touchpad').addEventListener('click', () => tapVirtual(BUTTON.TOUCHPAD));
 $('btn-fullscreen').addEventListener('click', toggleFullscreen);
+$('btn-pad').addEventListener('click', togglePad);
+$('btn-keys').addEventListener('click', toggleKeyGuide);
+$('btn-keys-close').addEventListener('click', toggleKeyGuide);
+// After a mouse click, hand the keyboard back to the game, so Space or Enter
+// presses ✕ on the PS5 instead of clicking the same button again.
+hud.addEventListener('click', (event) => {
+  if (event.detail > 0 && event.target instanceof Element) event.target.closest('button')?.blur();
+});
+wirePad();
+fillKeyGuide();
 $('panel-pin').addEventListener('submit', (event) => {
   event.preventDefault();
   const pin = $('pin-input').value.trim();
@@ -683,7 +842,11 @@ $('panel-pin').addEventListener('submit', (event) => {
 video.addEventListener('click', showHud);
 hud.addEventListener('click', showHud);
 window.addEventListener('pointermove', showHud);
-window.addEventListener('keydown', showHud); // so the controls are reachable without a pointer
+window.addEventListener('keydown', onKeyDown);
+window.addEventListener('keyup', onKeyUp);
+// A key let go while another window had focus never reports its release.
+window.addEventListener('blur', releaseAllInput);
+document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAllInput(); });
 window.addEventListener('gamepadconnected', loadStatus);
 
 // Remember the start-screen choices between visits.

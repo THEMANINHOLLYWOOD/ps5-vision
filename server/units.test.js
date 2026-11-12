@@ -7,6 +7,7 @@ import { OggOpusReader } from './ogg.js';
 import { broadcastAddresses, findLinkedConsole, locateConsole, parseDiscoveryResponse, wakeCredential } from './discovery.js';
 import { describeQuit, normalizeOptions } from './bridge.js';
 import { BUTTON, encodeState, idleState, readGamepad, statesEqual } from '../web/controller.js';
+import { KEY_GUIDE, KEY_MAP, isMappedKey, keyboardState, mergeStates } from '../web/keyboard.js';
 
 // ---------------------------------------------------------------- framing
 
@@ -355,4 +356,36 @@ test('another device at the saved address is not mistaken for the console', asyn
 test('no answer anywhere leaves the saved address to be tried directly', async () => {
   const found = await locateConsole(linked, { ask: network([], []) });
   assert.deepEqual(found, { reply: null, moved: false, otherDevice: false });
+});
+
+// ---------------------------------------------------------------- keyboard
+
+test('keys map to the controller: menus, face buttons, triggers', () => {
+  const state = keyboardState(new Set(['ArrowDown', 'Enter', 'KeyZ']));
+  assert.equal(state.buttons, BUTTON.DPAD_DOWN | BUTTON.CROSS);
+  assert.equal(state.l2, 255);
+  assert.equal(keyboardState(new Set(['Backspace'])).buttons, BUTTON.CIRCLE);
+  assert.equal(keyboardState(new Set(['KeyP'])).buttons, BUTTON.PS);
+  assert.equal(isMappedKey('KeyM'), false);
+});
+
+test('stick keys push all the way, and opposite keys cancel out', () => {
+  const state = keyboardState(new Set(['KeyW', 'KeyD', 'KeyF']));
+  assert.deepEqual([state.lx, state.ly, state.rx, state.ry], [32767, -32767, -32767, 0]);
+  assert.equal(keyboardState(new Set(['KeyA', 'KeyD'])).lx, 0);
+});
+
+test('every key in the guide is real and every mapped key is in the guide', () => {
+  assert.ok(KEY_GUIDE.length > 10);
+  for (const code of Object.keys(KEY_MAP)) assert.ok(isMappedKey(code));
+});
+
+test('inputs combine: buttons add up, sticks follow the furthest push', () => {
+  const pad = { ...idleState(), buttons: BUTTON.CROSS, lx: 1000, r2: 40 };
+  const keys = { ...idleState(), buttons: BUTTON.L1, lx: -32767, r2: 255 };
+  const merged = mergeStates(pad, keys, null);
+  assert.equal(merged.buttons, BUTTON.CROSS | BUTTON.L1);
+  assert.equal(merged.lx, -32767);
+  assert.equal(merged.r2, 255);
+  assert.deepEqual(mergeStates(), idleState());
 });

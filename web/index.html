@@ -25,6 +25,8 @@
         <button id="btn-refresh" type="button" title="Reconnect the picture if it freezes or lags">Refresh</button>
         <button id="btn-ps" type="button" title="Press the PS button">PS</button>
         <button id="btn-touchpad" type="button" title="Press the touchpad">Touchpad</button>
+        <button id="btn-pad" type="button" aria-pressed="false" title="Show a controller you can click">Buttons</button>
+        <button id="btn-keys" type="button" title="Which keys do what (or press ?)">Keys</button>
         <button id="btn-fullscreen" type="button">Fullscreen</button>
         <button id="btn-rest" type="button" title="End and put the PS5 in rest mode">Rest mode</button>
         <button id="btn-end" type="button" class="danger">End</button>
@@ -32,6 +34,48 @@
     </header>
 
     <p id="toast" class="toast" role="status" hidden></p>
+
+    <!-- A controller to click or tap, for when there is no real one. -->
+    <section id="pad" aria-label="On-screen controller" hidden>
+      <div class="pad-side">
+        <div class="pad-shoulders">
+          <button type="button" data-trigger="l2">L2</button>
+          <button type="button" data-button="L1">L1</button>
+        </div>
+        <div class="pad-cross">
+          <button type="button" data-button="DPAD_UP" class="up" aria-label="Up">▲</button>
+          <button type="button" data-button="DPAD_LEFT" class="left" aria-label="Left">◀</button>
+          <button type="button" data-button="DPAD_RIGHT" class="right" aria-label="Right">▶</button>
+          <button type="button" data-button="DPAD_DOWN" class="down" aria-label="Down">▼</button>
+        </div>
+        <button type="button" data-button="SHARE" class="pad-small">Create</button>
+      </div>
+      <div class="pad-middle">
+        <button type="button" data-button="TOUCHPAD" class="pad-touch">Touchpad</button>
+        <button type="button" data-button="PS" class="pad-small">PS</button>
+      </div>
+      <div class="pad-side">
+        <div class="pad-shoulders">
+          <button type="button" data-button="R1">R1</button>
+          <button type="button" data-trigger="r2">R2</button>
+        </div>
+        <div class="pad-cross face">
+          <button type="button" data-button="TRIANGLE" class="up" aria-label="Triangle">△</button>
+          <button type="button" data-button="SQUARE" class="left" aria-label="Square">□</button>
+          <button type="button" data-button="CIRCLE" class="right" aria-label="Circle">○</button>
+          <button type="button" data-button="CROSS" class="down" aria-label="Cross">✕</button>
+        </div>
+        <button type="button" data-button="OPTIONS" class="pad-small">Options</button>
+      </div>
+    </section>
+
+    <!-- Which keys do what. Opened with "?" or the Keys button. -->
+    <section id="keys" class="panel keys" aria-label="Keyboard controls" hidden>
+      <h2>Keyboard controls</h2>
+      <table id="keys-table"></table>
+      <p class="note small">A controller works at the same time. Press ? or Esc to close.</p>
+      <button id="btn-keys-close" type="button">Close</button>
+    </section>
 
     <section id="overlay">
       <!-- Shown before playing. -->

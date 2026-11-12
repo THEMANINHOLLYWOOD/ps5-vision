@@ -28,6 +28,7 @@ const STATIC_FILES = {
   '/index.html': ['index.html', 'text/html; charset=utf-8'],
   '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
   '/controller.js': ['controller.js', 'text/javascript; charset=utf-8'],
+  '/keyboard.js': ['keyboard.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['style.css', 'text/css; charset=utf-8'],
   '/capture.html': ['capture.html', 'text/html; charset=utf-8'],
   '/capture.js': ['capture.js', 'text/javascript; charset=utf-8'],

@@ -36,7 +36,9 @@ html, body {
 
 /* No pointer over the game; it comes back with the controls. */
 #stage.playing { cursor: none; }
-#stage.playing:has(#hud:not([hidden])) { cursor: auto; }
+#stage.playing:has(#hud:not([hidden])),
+#stage.playing:has(#pad:not([hidden])),
+#stage.playing:has(#keys:not([hidden])) { cursor: auto; }
 
 #screen {
   width: 100%;
@@ -259,7 +261,75 @@ button.danger { color: var(--danger); }
 }
 #pad-indicator[data-on="true"]::before { background: var(--ok); }
 
+/* ------------------------------------------------- on-screen controller */
+
+#pad {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 20px 28px 28px;
+  pointer-events: none; /* only the buttons catch clicks; the picture stays visible */
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+#pad button {
+  pointer-events: auto;
+  min-height: 56px;
+  min-width: 56px;
+  padding: 0 14px;
+  background: rgba(20, 24, 32, 0.6);
+  border: 1px solid var(--surface-edge);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  font-size: 18px;
+}
+#pad button.held { background: var(--accent); color: var(--accent-ink); }
+.pad-side, .pad-middle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.pad-shoulders { display: flex; gap: 10px; }
+.pad-cross {
+  display: grid;
+  grid-template: repeat(3, 56px) / repeat(3, 56px);
+  gap: 4px;
+}
+.pad-cross .up { grid-area: 1 / 2; }
+.pad-cross .left { grid-area: 2 / 1; }
+.pad-cross .right { grid-area: 2 / 3; }
+.pad-cross .down { grid-area: 3 / 2; }
+.pad-cross button { padding: 0; border-radius: 50%; }
+.pad-cross.face button { font-size: 24px; }
+#pad .pad-small { min-height: 44px; font-size: 14px; }
+#pad .pad-touch { min-width: 180px; border-radius: 18px; }
+
+/* ----------------------------------------------------------- key guide */
+
+.keys {
+  position: absolute;
+  max-height: calc(100% - 48px);
+  overflow: auto;
+  gap: 14px;
+}
+.keys table { border-collapse: collapse; text-align: left; font-size: 15px; }
+.keys td { padding: 6px 8px; border-top: 1px solid var(--surface-edge); }
+.keys td:first-child { white-space: nowrap; font-weight: 600; }
+.keys td:last-child { color: var(--ink-quiet); }
+.keys kbd { font: inherit; }
+
 @media (max-width: 560px) {
+  #pad { padding: 12px; }
+  .pad-cross { grid-template: repeat(3, 46px) / repeat(3, 46px); }
+  #pad button { min-height: 46px; min-width: 46px; }
+  #pad .pad-touch { min-width: 110px; }
   .panel { padding: 28px 22px; }
   h1 { font-size: 34px; }
   .row { grid-template-columns: 1fr; }

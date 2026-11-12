@@ -610,6 +610,11 @@ int main(int argc, char **argv)
 	}
 
 	uint32_t mask = CHIAKI_LOG_ALL & ~(CHIAKI_LOG_VERBOSE | CHIAKI_LOG_DEBUG);
+	// While streaming, chiaki reports routine traffic (heartbeats, recovered
+	// packets) at the info level every few seconds, which buries anything that
+	// matters in the bridge's window. --verbose brings it back.
+	if(strcmp(argv[1], "stream") == 0)
+		mask = CHIAKI_LOG_WARNING | CHIAKI_LOG_ERROR;
 	if(arg_flag(argc, argv, "--verbose"))
 		mask = CHIAKI_LOG_ALL & ~CHIAKI_LOG_DEBUG;
 	chiaki_log_init(&g_log, mask, log_cb, NULL);

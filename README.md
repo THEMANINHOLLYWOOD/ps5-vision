@@ -169,9 +169,10 @@ To put it on your headset you need a Mac with Xcode and a free Apple account.
 Once:
 
 1. In Xcode, Settings > Accounts: add your Apple account.
-2. Pair the headset: on it, open Settings > General > Remote Devices; on the
-   Mac, open Xcode > Window > Devices and Simulators, click the headset, click
-   Pair and type the code it shows. Turn on Developer Mode if it asks.
+2. Pair the headset: on it, open Settings > General > Remote Devices, then run
+   `npm run vision:pair` on the Mac and type the code the headset shows. (Or
+   use Xcode > Window > Devices and Simulators > Pair.) Turn on Developer Mode
+   on the headset if it asks.
 
 Then:
 

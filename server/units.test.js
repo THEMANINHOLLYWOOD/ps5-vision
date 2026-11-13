@@ -9,7 +9,7 @@ import { consoleEndedIt, describeQuit, normalizeOptions, shouldRejoin } from './
 import { txtRecord } from './bonjour.js';
 import { nextAudioSamples } from './viewer.js';
 import { BUTTON, encodeState, idleState, readGamepad, statesEqual } from '../web/controller.js';
-import { KEY_GUIDE, KEY_MAP, isMappedKey, keyboardState, mergeStates } from '../web/keyboard.js';
+import { KEY_GUIDE, KEY_MAP, LAYOUTS, TARGETS, compileLayout, findLayout, guideFor, isMappedKey, keyboardState, mergeStates, mouseToStick, unreachable } from '../web/keyboard.js';
 
 // ---------------------------------------------------------------- framing
 
@@ -459,4 +459,59 @@ test('Create and Options together stand in for the PS button', () => {
   assert.equal(readGamepad(pressed(8, 9, 0)).buttons, BUTTON.PS | BUTTON.CROSS);
   assert.equal(readGamepad(pressed(8)).buttons, BUTTON.SHARE);
   assert.equal(readGamepad(pressed(9)).buttons, BUTTON.OPTIONS);
+});
+
+// ---------------------------------------------------------------- layouts
+
+test('every layout can press every button, and never uses a key the browser needs', () => {
+  for (const layout of LAYOUTS) {
+    assert.deepEqual(unreachable(layout), [], `${layout.id} leaves something out`);
+    for (const [code, target] of Object.entries(layout.keys)) {
+      assert.ok(TARGETS[target], `${layout.id}: ${code} is bound to unknown ${target}`);
+      assert.ok(!/^(Control|Alt|Meta|OS)/.test(code), `${layout.id}: ${code} would close tabs with W or Q`);
+    }
+    assert.ok(guideFor(layout).length > 8);
+    // The PS5's own menus always work.
+    const map = compileLayout(layout);
+    assert.equal(keyboardState(new Set(['ArrowLeft', 'Enter']), map).buttons, BUTTON.DPAD_LEFT | BUTTON.CROSS);
+    assert.equal(keyboardState(new Set(['Backspace']), map).buttons, BUTTON.CIRCLE);
+  }
+  assert.equal(findLayout('nonsense').id, 'standard');
+});
+
+test('the PC layout plays a shooter: WASD, mouse buttons, and no Esc', () => {
+  const pc = findLayout('pc');
+  const map = compileLayout(pc);
+  const state = keyboardState(new Set(['KeyW', 'KeyA', 'Mouse0', 'Mouse2', 'Space', 'ShiftLeft']), map);
+  assert.equal(state.ly, -32767);
+  assert.equal(state.lx, -32767);
+  assert.equal(state.r2, 255);
+  assert.equal(state.l2, 255);
+  assert.equal(state.buttons, BUTTON.CROSS | BUTTON.L3);
+  assert.equal(keyboardState(new Set(['KeyR']), map).buttons, BUTTON.SQUARE);
+  assert.ok(pc.mouseLook);
+  assert.ok(!isMappedKey('Escape', map), 'Esc is how the browser lets go of the mouse');
+  assert.ok(guideFor(pc).some(([keys, what]) => keys === 'Mouse' && /look/.test(what)));
+});
+
+test('clicks, right-clicks and swipes on the picture press the menu buttons', () => {
+  const map = compileLayout(findLayout('pc'));
+  assert.equal(keyboardState(new Set(['PointerSelect']), map).buttons, BUTTON.CROSS);
+  assert.equal(keyboardState(new Set(['PointerBack']), map).buttons, BUTTON.CIRCLE);
+  assert.equal(keyboardState(new Set(['PointerRight']), map).buttons, BUTTON.DPAD_RIGHT);
+});
+
+test('mouse movement pushes the right stick, further the faster it moves', () => {
+  assert.deepEqual(mouseToStick(0, 0, 8), { rx: 0, ry: 0 });
+  const slow = mouseToStick(1, 0, 8);
+  const fast = mouseToStick(40, 0, 8);
+  assert.ok(slow.rx > 32767 * 0.2, 'even the smallest movement clears a game\'s dead zone');
+  assert.ok(slow.rx < fast.rx);
+  assert.equal(fast.rx, 32767);
+  assert.equal(fast.ry, 0);
+  const up = mouseToStick(0, -40, 8);
+  assert.equal(up.ry, -32767);
+  const diagonal = mouseToStick(30, 30, 8);
+  assert.ok(Math.abs(diagonal.rx - diagonal.ry) <= 1 && diagonal.rx > 20000);
+  assert.ok(mouseToStick(4, 0, 8, 2).rx > mouseToStick(4, 0, 8, 1).rx, 'a higher speed setting turns faster');
 });

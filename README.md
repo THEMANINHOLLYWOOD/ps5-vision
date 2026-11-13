@@ -130,22 +130,34 @@ aren't touching it while you play), and lets it sleep again afterwards.
 
 ### Playing from a laptop
 
-No controller needed. While the picture is up, the keyboard is the controller:
+No controller needed: the keyboard and mouse are the controller. Press **?**
+while playing (or **More > Keyboard and mouse**) to pick a layout and see
+which keys do what. Three come built in, and your choice is remembered:
 
-| Keys | Controller |
-| --- | --- |
-| Arrow keys | D-pad (move around the PS5's menus) |
-| Enter, Space or K | ✕ (select) |
-| Backspace, Esc or L | ○ (back) |
-| J / I | □ / △ |
-| W A S D | Left stick |
-| T F G H | Right stick |
-| Q / E, Z / C | L1 / R1, L2 / R2 |
-| Left Shift / V | L3 / R3 |
-| O, U, P, Y | Options, Create, PS button, touchpad press |
+- **Menus and any game.** Everything on the keyboard: arrows for the D-pad,
+  Enter or Space for ✕, Backspace or Esc for ○, W A S D and T F G H for the
+  sticks, and so on.
+- **Keyboard and mouse, like on PC.** For shooters and third-person games.
+  Click the picture to capture the mouse: moving it looks around, left click
+  fires (R2), right click aims (L2), W A S D move, Space jumps, C crouches, R
+  reloads, Shift sprints, the wheel switches weapon. Esc lets the mouse go.
+  A mouse-speed slider sits above the key list.
+- **Driving.** W and S are the pedals, A and D steer.
+
+In every layout the arrow keys, Enter and Backspace work the PS5's own menus,
+and every controller button has a key.
+
+The picture itself can be clicked like a desktop app: click (or tap, or pinch
+on a Vision Pro) selects, right-click goes back, and the scroll wheel or a
+drag moves the highlight. The PS5 has no pointer of its own, so a click
+selects what is highlighted, not what is under the cursor. Clicks along the
+top edge, or on the small handle there, bring up the control bar instead.
+**More > Click and swipe to move** turns this off.
 
 Or choose **More > On-screen buttons** for a controller you can click; each
-button stays down for as long as you hold it. A real controller works at the same time.
+button stays down for as long as you hold it. A real controller works at the
+same time. On a controller, **Create + Options** held together press the PS
+button, for devices (like a Vision Pro) that keep the real one for themselves.
 
 ### Other ways to run it
 

@@ -42,6 +42,7 @@ html, body {
 #stage.playing:has(#keys:not([hidden])) { cursor: auto; }
 
 #screen {
+  touch-action: none; /* swipes on the picture move the PS5's highlight */
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -354,6 +355,28 @@ summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 }
 
 
+/* A faint handle where the bar will appear: click, tap or pinch it. */
+#hud-handle {
+  display: none;
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 64px;
+  min-height: 0;
+  height: 10px;
+  padding: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  background-clip: content-box;
+  border: 12px solid transparent; /* a bigger target than it looks */
+  box-sizing: content-box;
+  top: -2px;
+  opacity: 0.55;
+}
+#hud-handle:hover { opacity: 1; background: rgba(255, 255, 255, 0.5); background-clip: content-box; }
+#stage.playing #hud[hidden] + #hud-handle { display: block; }
+
 /* ------------------------------------------------- on-screen controller */
 
 #pad {
@@ -413,6 +436,9 @@ summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
   gap: 14px;
 }
 .keys table { border-collapse: collapse; text-align: left; font-size: 15px; }
+.keys input[type="range"] { min-height: 32px; padding: 0; accent-color: var(--accent); background: none; }
+.keys select { min-height: 52px; }
+.keys #layout-about { text-align: left; }
 .keys td { padding: 6px 8px; border-top: 1px solid var(--surface-edge); }
 .keys td:first-child { white-space: nowrap; font-weight: 600; }
 .keys td:last-child { color: var(--ink-quiet); }

@@ -43,12 +43,16 @@
       <div id="menu" class="menu" hidden>
         <button id="btn-touchpad" type="button">Touchpad press</button>
         <button id="btn-pad" type="button" aria-pressed="false">On-screen buttons</button>
-        <button id="btn-keys" type="button">Keyboard controls</button>
+        <button id="btn-keys" type="button">Keyboard and mouse</button>
+        <button id="btn-pointer" type="button" aria-pressed="true">Click and swipe to move</button>
         <button id="btn-fullscreen" type="button">Fullscreen</button>
         <button id="btn-refresh" type="button">Refresh picture</button>
         <button id="btn-rest" type="button">End and rest PS5</button>
       </div>
     </header>
+
+    <!-- Always there while the bar is away, so there is something to aim at. -->
+    <button id="hud-handle" type="button" aria-label="Show controls"></button>
 
     <p id="toast" class="toast" role="status" hidden></p>
 
@@ -88,7 +92,16 @@
 
     <!-- Which keys do what. Opened with "?" or the Keys button. -->
     <section id="keys" class="panel keys" aria-label="Keyboard controls" hidden>
-      <h2>Keyboard controls</h2>
+      <h2>Keyboard and mouse</h2>
+      <label>
+        <span>Layout</span>
+        <select id="layout"></select>
+      </label>
+      <p id="layout-about" class="note small"></p>
+      <label id="mouse-row" hidden>
+        <span>Mouse speed</span>
+        <input id="mouse-speed" type="range" min="20" max="300" step="5" value="100">
+      </label>
       <table id="keys-table"></table>
       <p class="note small">A controller works at the same time; on it, Create and Options held together press the PS button. Press ? or Esc to close.</p>
       <button id="btn-keys-close" type="button">Close</button>

@@ -2,7 +2,7 @@
 // WebRTC and sends controller input back.
 
 import { BUTTON, encodeState, idleState, readGamepad, statesEqual } from './controller.js';
-import { KEY_GUIDE, isMappedKey, keyboardState, mergeStates } from './keyboard.js';
+import { LAYOUTS, compileLayout, findLayout, guideFor, isMappedKey, keyboardState, mergeStates, mouseToStick } from './keyboard.js';
 
 const $ = (id) => document.getElementById(id);
 const video = $('screen');
@@ -643,7 +643,7 @@ function pollController() {
   }
   if (inputChannel?.readyState !== 'open') return;
 
-  const state = mergeStates(readGamepad(gamepad, virtualButtons), keyboardState(heldKeys), padState, native);
+  const state = mergeStates(readGamepad(gamepad, virtualButtons), keyboardState(heldKeys, keyMap), lookState(now), padState, native);
   if (statesEqual(state, lastSent) && now - lastSentAt < RESEND_INTERVAL_MS) return;
   inputChannel.send(encodeState(state));
   lastSent = state;
@@ -691,7 +691,7 @@ function onKeyDown(event) {
   const target = event.target instanceof Element ? event.target : null;
   if (target?.closest('input, select, textarea')) return;
   const activates = ['Enter', 'NumpadEnter', 'Space'].includes(event.code);
-  if (!isMappedKey(event.code) || (activates && target?.closest('button, a'))) {
+  if (!isMappedKey(event.code, keyMap) || (activates && target?.closest('button, a'))) {
     showHud(); // e.g. Tab: so the controls are reachable without a pointer
     return;
   }
@@ -719,6 +719,8 @@ function afterMinimumPress(what, release) {
 function releaseAllInput() {
   heldKeys.clear();
   pressedAt.clear();
+  lookMoves = [];
+  drag = null;
   padState = idleState();
   for (const button of document.querySelectorAll('#pad .held')) button.classList.remove('held');
 }
@@ -727,6 +729,7 @@ function toggleKeyGuide() {
   const guide = $('keys');
   guide.hidden = !guide.hidden;
   releaseAllInput(); // Shift (for ?) is also L3; don't leave it held
+  if (!guide.hidden && document.pointerLockElement) document.exitPointerLock();
   if (!guide.hidden) $('btn-keys-close').focus({ preventScroll: true });
   else document.activeElement?.blur?.();
 }
@@ -779,11 +782,159 @@ function wirePad() {
 
 function fillKeyGuide() {
   const table = $('keys-table');
-  for (const [keys, action] of KEY_GUIDE) {
+  table.replaceChildren();
+  for (const [keys, action] of guideFor(layout)) {
     const row = table.insertRow();
     row.insertCell().textContent = keys;
     row.insertCell().textContent = action;
   }
+}
+
+// ------------------------------------------------------- layouts and mouse
+
+// Which keys do what depends on the game: menus, a shooter and a racing game
+// each want the keyboard differently. The choice is remembered.
+let layout = LAYOUTS[0];
+let keyMap = compileLayout(layout);
+
+function useLayout(id) {
+  layout = findLayout(id);
+  keyMap = compileLayout(layout);
+  try { localStorage.setItem('layout', layout.id); } catch { /* not remembered */ }
+  releaseAllInput();
+  if (!layout.mouseLook && document.pointerLockElement) document.exitPointerLock();
+  $('layout').value = layout.id;
+  $('layout-about').textContent = layout.about;
+  $('mouse-row').hidden = !layout.mouseLook;
+  fillKeyGuide();
+}
+
+// A key or mouse button going down and up, and one that is only tapped
+// (a click, one notch of the wheel): held for a moment so it isn't missed.
+function pressKey(code) {
+  pressedAt.set(code, performance.now());
+  heldKeys.add(code);
+}
+function releaseKey(code) {
+  if (heldKeys.has(code)) afterMinimumPress(code, () => heldKeys.delete(code));
+}
+function tapKey(code, ms = 90) {
+  const at = performance.now();
+  pressedAt.set(code, at);
+  heldKeys.add(code);
+  setTimeout(() => { if (pressedAt.get(code) === at) heldKeys.delete(code); }, ms);
+}
+
+// Looking around with the mouse, in layouts that have it: the browser hands
+// over the mouse (the pointer disappears, movement has no edges) until Esc.
+let mouseSpeed = savedNumber('mouse-speed', 100);
+let lookMoves = []; // recent mouse movement: { at, dx, dy }
+
+function mouseCaptured() {
+  return document.pointerLockElement === $('stage');
+}
+
+function captureMouse() {
+  const stage = $('stage');
+  if (!stage.requestPointerLock) return;
+  try {
+    // Without the system's pointer acceleration where the browser can: the
+    // same hand movement then always turns the same amount.
+    const asked = stage.requestPointerLock({ unadjustedMovement: true });
+    asked?.catch?.(() => { try { stage.requestPointerLock(); } catch { /* not allowed now */ } });
+  } catch {
+    try { stage.requestPointerLock(); } catch { /* not allowed now */ }
+  }
+}
+
+// The mouse reports in uneven bursts, so its speed is taken over the last few
+// reports together: the turn is then steady, and stops the moment the hand does.
+const LOOK_WINDOW_MS = 36;
+
+function lookState(now) {
+  if (!mouseCaptured()) return null;
+  while (lookMoves.length && now - lookMoves[0].at > LOOK_WINDOW_MS) lookMoves.shift();
+  let dx = 0;
+  let dy = 0;
+  for (const move of lookMoves) {
+    dx += move.dx;
+    dy += move.dy;
+  }
+  return { ...idleState(), ...mouseToStick(dx, dy, LOOK_WINDOW_MS, mouseSpeed / 100) };
+}
+
+// Clicking, scrolling and swiping on the picture move around the PS5's
+// menus, much as on a desktop: click (or tap, or pinch) selects, right-click
+// goes back, the wheel or a drag moves the highlight. The PS5 has no pointer
+// of its own, so a click selects what is highlighted, not what is under it.
+// The strip along the top is kept for bringing up the controls.
+const SWIPE_STEP_PX = 70;
+const WHEEL_STEP_MS = 110;
+const HUD_STRIP = 0.14;
+let pointerNav = true;
+try { pointerNav = localStorage.getItem('pointer-nav') !== '0'; } catch { /* default */ }
+let drag = null;
+let lastWheelStep = 0;
+
+function inHudStrip(event) {
+  const box = $('stage').getBoundingClientRect();
+  return event.clientY - box.top < box.height * HUD_STRIP;
+}
+
+function onPicturePointerDown(event) {
+  if (!streaming || (event.pointerType === 'mouse' && event.button !== 0)) return;
+  if (inHudStrip(event)) {
+    showHud();
+    return;
+  }
+  if (layout.mouseLook && event.pointerType === 'mouse') {
+    captureMouse();
+    return;
+  }
+  if (!pointerNav) {
+    showHud();
+    return;
+  }
+  drag = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+  try { video.setPointerCapture(event.pointerId); } catch { /* released on pointerup instead */ }
+}
+
+function onPicturePointerMove(event) {
+  if (!drag || event.pointerId !== drag.id) return;
+  const dx = event.clientX - drag.x;
+  const dy = event.clientY - drag.y;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_STEP_PX) return;
+  drag.moved = true;
+  drag.x = event.clientX;
+  drag.y = event.clientY;
+  if (Math.abs(dx) > Math.abs(dy)) tapKey(dx > 0 ? 'PointerRight' : 'PointerLeft');
+  else tapKey(dy > 0 ? 'PointerDown' : 'PointerUp');
+}
+
+function onPicturePointerUp(event) {
+  if (!drag || event.pointerId !== drag.id) return;
+  if (!drag.moved && event.type === 'pointerup') tapKey('PointerSelect');
+  drag = null;
+}
+
+function onWheel(event) {
+  if (!streaming) return;
+  if (mouseCaptured()) {
+    event.preventDefault();
+    tapKey(event.deltaY < 0 ? 'WheelUp' : 'WheelDown');
+    return;
+  }
+  if (!pointerNav || event.target !== video) return;
+  event.preventDefault();
+  const now = performance.now();
+  if (now - lastWheelStep < WHEEL_STEP_MS) return;
+  lastWheelStep = now;
+  if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) tapKey(event.deltaX > 0 ? 'PointerRight' : 'PointerLeft');
+  else if (event.deltaY !== 0) tapKey(event.deltaY > 0 ? 'PointerDown' : 'PointerUp');
+}
+
+function updatePointerNav() {
+  $('btn-pointer').setAttribute('aria-pressed', String(pointerNav));
 }
 
 // The Vision Pro app reads the controller itself and hands it to the page.
@@ -1020,7 +1171,52 @@ hud.addEventListener('click', (event) => {
   if (event.detail > 0 && event.target instanceof Element) event.target.closest('button')?.blur();
 });
 wirePad();
-fillKeyGuide();
+for (const choice of LAYOUTS) $('layout').add(new Option(choice.name, choice.id));
+let savedLayout = null;
+try { savedLayout = localStorage.getItem('layout'); } catch { /* the first one */ }
+useLayout(savedLayout);
+$('layout').addEventListener('change', () => useLayout($('layout').value));
+$('mouse-speed').value = String(mouseSpeed);
+$('mouse-speed').addEventListener('input', () => {
+  mouseSpeed = Number($('mouse-speed').value);
+  try { localStorage.setItem('mouse-speed', String(mouseSpeed)); } catch { /* not remembered */ }
+});
+updatePointerNav();
+$('btn-pointer').addEventListener('click', () => {
+  pointerNav = !pointerNav;
+  try { localStorage.setItem('pointer-nav', pointerNav ? '1' : '0'); } catch { /* not remembered */ }
+  updatePointerNav();
+});
+$('hud-handle').addEventListener('click', showHud);
+
+video.addEventListener('pointerdown', onPicturePointerDown);
+video.addEventListener('pointermove', onPicturePointerMove);
+video.addEventListener('pointerup', onPicturePointerUp);
+video.addEventListener('pointercancel', onPicturePointerUp);
+video.addEventListener('contextmenu', (event) => {
+  event.preventDefault();
+  if (streaming && pointerNav && !mouseCaptured() && !inHudStrip(event)) tapKey('PointerBack');
+});
+$('stage').addEventListener('wheel', onWheel, { passive: false });
+// With the mouse captured, its buttons are controller buttons.
+window.addEventListener('mousemove', (event) => {
+  if (!mouseCaptured()) return;
+  lookMoves.push({ at: performance.now(), dx: event.movementX, dy: event.movementY });
+});
+window.addEventListener('mousedown', (event) => {
+  if (!mouseCaptured()) return;
+  event.preventDefault();
+  pressKey(`Mouse${event.button}`);
+  keyboardUsed = true;
+});
+window.addEventListener('mouseup', (event) => releaseKey(`Mouse${event.button}`));
+document.addEventListener('pointerlockchange', () => {
+  releaseAllInput();
+  if (!streaming || !layout.mouseLook) return;
+  showToast(mouseCaptured()
+    ? 'Mouse captured for looking around. Esc lets it go.'
+    : 'Mouse let go. Click the picture to capture it again.', 3500);
+});
 $('panel-pin').addEventListener('submit', (event) => {
   event.preventDefault();
   const pin = $('pin-input').value.trim();
@@ -1030,9 +1226,13 @@ $('panel-pin').addEventListener('submit', (event) => {
 });
 
 // Looking at the picture and pinching (or clicking) brings the controls back.
-video.addEventListener('click', showHud);
 hud.addEventListener('click', showHud);
-window.addEventListener('pointermove', showHud);
+// Moving the mouse brings the controls back, unless the mouse is busy
+// playing: then only the top of the picture does.
+window.addEventListener('pointermove', (event) => {
+  if (mouseCaptured() || drag) return;
+  if (event.pointerType !== 'mouse' || !pointerNav || inHudStrip(event)) showHud();
+});
 window.addEventListener('keydown', onKeyDown);
 window.addEventListener('keyup', onKeyUp);
 // A key let go while another window had focus never reports its release.

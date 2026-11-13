@@ -12,24 +12,41 @@
   <main id="stage">
     <video id="screen" playsinline autoplay></video>
 
+    <!-- One small bar while playing; everything used less often is under "More". -->
     <header id="hud" hidden>
-      <div class="hud-group">
-        <span id="pad-indicator" class="chip" data-on="false">No controller</span>
-        <span id="stats" class="chip chip-quiet"></span>
-      </div>
-      <div class="hud-group">
-        <div class="chip volume">
-          <button id="btn-mute" type="button" class="icon" aria-label="Mute">🔊</button>
+      <div class="bar">
+        <button id="btn-status" type="button" class="status" aria-expanded="false" aria-controls="details" title="Connection details">
+          <span id="signal" class="signal" data-level="0" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span id="pad-indicator" data-on="false"></span>
+        </button>
+        <div class="volume">
+          <button id="btn-mute" type="button" class="icon" data-state="on" aria-label="Mute">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" fill="currentColor" stroke="none"/>
+              <path class="wave-low" d="M15.5 9.5a3.5 3.5 0 0 1 0 5"/>
+              <path class="wave-high" d="M18 7a7 7 0 0 1 0 10"/>
+              <path class="cross" d="M16 9.5l5 5m0-5l-5 5"/>
+            </svg>
+          </button>
           <input id="volume" type="range" min="0" max="100" step="1" value="80" aria-label="Volume">
         </div>
-        <button id="btn-refresh" type="button" title="Reconnect the picture if it freezes or lags">Refresh</button>
-        <button id="btn-ps" type="button" title="Press the PS button">PS</button>
-        <button id="btn-touchpad" type="button" title="Press the touchpad">Touchpad</button>
-        <button id="btn-pad" type="button" aria-pressed="false" title="Show a controller you can click">Buttons</button>
-        <button id="btn-keys" type="button" title="Which keys do what (or press ?)">Keys</button>
-        <button id="btn-fullscreen" type="button">Fullscreen</button>
-        <button id="btn-rest" type="button" title="End and put the PS5 in rest mode">Rest mode</button>
+        <button id="btn-ps" type="button" class="icon" title="Press the PS button">PS</button>
+        <button id="btn-menu" type="button" class="icon" aria-label="More" aria-expanded="false" aria-controls="menu">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+        </button>
         <button id="btn-end" type="button" class="danger">End</button>
+      </div>
+      <div id="details" class="details" hidden>
+        <p id="stats"></p>
+        <p id="pad-hint"></p>
+      </div>
+      <div id="menu" class="menu" hidden>
+        <button id="btn-touchpad" type="button">Touchpad press</button>
+        <button id="btn-pad" type="button" aria-pressed="false">On-screen buttons</button>
+        <button id="btn-keys" type="button">Keyboard controls</button>
+        <button id="btn-fullscreen" type="button">Fullscreen</button>
+        <button id="btn-refresh" type="button">Refresh picture</button>
+        <button id="btn-rest" type="button">End and rest PS5</button>
       </div>
     </header>
 
@@ -87,33 +104,37 @@
           <span>Access code</span>
           <input id="code-input" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" aria-describedby="start-note">
         </label>
-        <div class="row" id="quality-row">
-          <label>
-            <span>Resolution</span>
-            <select id="opt-res">
-              <option value="1080" selected>1080p</option>
-              <option value="720">720p</option>
-              <option value="540">540p</option>
-            </select>
-          </label>
-          <label>
-            <span>Frame rate</span>
-            <select id="opt-fps">
-              <option value="60" selected>60 fps</option>
-              <option value="30">30 fps</option>
-            </select>
-          </label>
-        </div>
-        <label>
-          <span>Wi-Fi</span>
-          <select id="opt-net">
-            <option value="weak" selected>Weak or busy (lighter stream, fewer glitches)</option>
-            <option value="strong">Strong (sharpest picture)</option>
-          </select>
-        </label>
         <button id="btn-play" type="button" class="primary" disabled>Play</button>
-        <p id="pad-note" class="note small"></p>
-        <p class="note small"><a href="/capture.html">Using an HDMI capture card instead?</a></p>
+        <!-- Closed by default: the choices are remembered, so most visits are one tap. -->
+        <details id="options">
+          <summary><span id="options-summary">Picture</span></summary>
+          <div class="row">
+            <label>
+              <span>Resolution</span>
+              <select id="opt-res">
+                <option value="1080" selected>1080p</option>
+                <option value="720">720p</option>
+                <option value="540">540p</option>
+              </select>
+            </label>
+            <label>
+              <span>Frame rate</span>
+              <select id="opt-fps">
+                <option value="60" selected>60 fps</option>
+                <option value="30">30 fps</option>
+              </select>
+            </label>
+          </div>
+          <label>
+            <span>Wi-Fi</span>
+            <select id="opt-net">
+              <option value="weak" selected>Weak or busy (lighter stream, fewer glitches)</option>
+              <option value="strong">Strong (sharpest picture)</option>
+            </select>
+          </label>
+          <p id="pad-note" class="note small"></p>
+          <p id="capture-note" class="note small"><a href="/capture.html">Using an HDMI capture card instead?</a></p>
+        </details>
       </div>
 
       <!-- Shown while waking / connecting. -->
@@ -136,6 +157,7 @@
         <h2 id="ended-title">Session ended</h2>
         <p id="ended-text" class="note"></p>
         <button id="btn-again" type="button" class="primary">Play again</button>
+        <button id="btn-settings" type="button" class="quiet">Picture settings</button>
       </div>
 
       <!-- Shown if the browser refuses to start playback without a tap. -->

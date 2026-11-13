@@ -12,6 +12,13 @@ const IDLE_STOP_MS = 10_000;
 const CONNECT_TIMEOUT_MS = 30_000;
 const WAKE_TIMEOUT_MS = 75_000;
 const KEYFRAME_MIN_INTERVAL_MS = 700;
+// Sound arrives a hundred times a second even when the game is silent, so
+// this long with neither sound nor picture means the session has died.
+const STALLED_SOURCE_MS = 8000;
+// How long after such a death to keep retrying while the console says it is
+// still busy with the old session, and how often.
+const RETRY_BUSY_MS = 60_000;
+const RETRY_BUSY_GAP_MS = 4000;
 
 // Plain-language versions of the reasons chiaki reports for a session ending.
 const QUIT_HINTS = [
@@ -60,7 +67,14 @@ export class Bridge {
     this.idleTimer = null;
     this.lastKeyframeRequest = 0;
 
-    this.statsTimer = setInterval(() => this.#sendStats(), 1000);
+    // A slip in the once-a-second housekeeping must never end the game.
+    this.statsTimer = setInterval(() => {
+      try {
+        this.#sendStats();
+      } catch (err) {
+        this.log(`unexpected error: ${err.stack ?? err.message}`);
+      }
+    }, 1000);
     this.statsTimer.unref();
   }
 
@@ -94,6 +108,11 @@ export class Bridge {
     viewer.on('input', (state) => this.source?.sendController(state));
     viewer.on('control', (message) => this.#onControl(viewer, message));
     viewer.on('closed', () => this.#detach(viewer));
+    // No input can arrive during a hiccup: don't leave a button or stick held.
+    viewer.on('stalled', () => this.source?.sendController(Buffer.alloc(CONTROLLER_STATE_SIZE)));
+    viewer.on('recovered', () => {
+      if (this.viewer === viewer && this.sourceConnected) this.#requestKeyframe(true);
+    });
     viewer.on('state', (state) => this.log(`viewer ${viewer.id}: ${state}`));
     // A browser that asked to connect and then went away (headset taken off,
     // page closed) never answers; don't keep a console session up for it.
@@ -202,6 +221,7 @@ export class Bridge {
 
   #sendStats() {
     const viewer = this.viewer;
+    this.#checkSource(); // may let go of a session that has died
     if (!viewer?.ready || !this.source) {
       this.lastStatsAt = null; // don't average the next sample over the gap
       return;
@@ -267,10 +287,14 @@ export class Bridge {
       this.viewer?.resync();
     });
     source.on('video', (unit, tsUs) => {
+      this.lastMediaAt = Date.now();
       const v = this.viewer;
       if (v && !v.pushVideo(unit, tsUs) && v.ready && v.needKeyframe) this.#requestKeyframe(false);
     });
-    source.on('audio', (packet) => this.viewer?.pushAudio(packet));
+    source.on('audio', (packet, tsUs) => {
+      this.lastMediaAt = Date.now();
+      this.viewer?.pushAudio(packet, tsUs);
+    });
     source.on('event', (event) => this.#onSourceEvent(source, event));
     source.on('exit', ({ code, signal }) => {
       if (this.source !== source) return;
@@ -301,6 +325,7 @@ export class Bridge {
     switch (event.type) {
       case 'connected':
         this.sourceConnected = true;
+        this.lastMediaAt = Date.now();
         this.log('stream connected');
         this.viewer?.sendControl({ type: 'state', state: 'streaming' });
         break;
@@ -311,6 +336,13 @@ export class Bridge {
       case 'frames_lost':
         this.framesLost += event.count || 0;
         break;
+      case 'video_skipped':
+        // The helper left pictures out because we were behind (a busy Mac,
+        // or a viewer on a weak connection). The picture restarts from a
+        // keyframe; ask the console for one.
+        this.viewer?.resync();
+        this.#requestKeyframe(true);
+        break;
       case 'login_pin_request':
         this.viewer?.sendControl({ type: 'pin_request', incorrect: Boolean(event.incorrect) });
         break;
@@ -320,6 +352,12 @@ export class Bridge {
       case 'quit':
         this.sourceQuitReported = true;
         this.log(`session ended: ${event.reason}${event.detail ? ` (${event.detail})` : ''}`);
+        // After a session died without a goodbye, the console goes on
+        // holding it for a little while and turns the new one away.
+        if (event.error && /already in use/i.test(event.reason) && Date.now() < (this.retryBusyUntil ?? 0)) {
+          this.#retrySoon(source);
+          break;
+        }
         this.viewer?.sendControl({
           type: 'ended',
           error: Boolean(event.error),
@@ -338,6 +376,53 @@ export class Bridge {
       source.once('exit', resolve);
       source.stop();
     });
+  }
+
+  // Starts the session again a few seconds after `source` has gone, for
+  // whoever is still watching.
+  #retrySoon(source) {
+    const viewer = this.viewer;
+    const options = this.sourceOptions;
+    this.log('the console is still holding the old session; trying again shortly');
+    source.once('exit', () => {
+      setTimeout(() => {
+        if (!viewer || this.viewer !== viewer || this.source) return;
+        this.#startSource(viewer, options)
+          .catch((err) => this.log(`could not reconnect to the console: ${err.stack ?? err.message}`));
+      }, RETRY_BUSY_GAP_MS);
+    });
+  }
+
+  // A session can die without saying so: the link to the console drops and
+  // the helper keeps waiting on it for ever, with the picture frozen. Notice,
+  // and connect to the console again for whoever is watching.
+  #checkSource() {
+    const source = this.source;
+    if (!source || !this.sourceConnected || source.stopping) return;
+    if (Date.now() - this.lastMediaAt < STALLED_SOURCE_MS) return;
+    const viewer = this.viewer;
+    const options = this.sourceOptions;
+    this.log('nothing from the console for a while; connecting to it again');
+    this.retryBusyUntil = Date.now() + RETRY_BUSY_MS;
+    viewer?.sendControl({ type: 'state', state: 'connecting' });
+    // Let go of the dead session first, so its goodbye isn't passed on to the
+    // browser as the end of the game.
+    this.source = null;
+    this.sourceOptions = null;
+    this.sourceConnected = false;
+    const gone = new Promise((resolve) => {
+      source.once('exit', resolve);
+      setTimeout(resolve, 6000).unref(); // it is killed after 5 s if it won't go
+    });
+    source.stop();
+    gone.then(() => {
+      if (!viewer || this.viewer !== viewer || this.source) {
+        this.letSleep?.();
+        this.letSleep = null;
+        return null;
+      }
+      return this.#startSource(viewer, options);
+    }).catch((err) => this.log(`could not reconnect to the console: ${err.stack ?? err.message}`));
   }
 
   // Finds the console and, if it is in rest mode, wakes it and waits.

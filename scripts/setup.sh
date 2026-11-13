@@ -60,6 +60,24 @@ if ! grep -q 'ps5-vision: Takion resends' vendor/chiaki-ng/lib/src/streamconnect
 fi
 grep -q 'ps5-vision: Takion resends' vendor/chiaki-ng/lib/src/streamconnection.c \
   || echo "warning: could not lengthen the connect wait (chiaki-ng changed); connecting may fail the first time." >&2
+# chiaki-ng lets the system hold about 100 KB of the stream for it: less than a
+# tenth of a second of video. Whenever the Mac is busy for longer than that,
+# the rest is thrown away and the picture freezes until the next keyframe.
+# 2 MB rides out about a second. (What the console is told is left alone.)
+if ! grep -q 'ps5-vision: receive buffer' vendor/chiaki-ng/lib/src/takion.c; then
+  perl -pi -e 's|^(\t\tconst int rcvbuf_val = )takion->a_rwnd;$|${1}2 * 1024 * 1024; // ps5-vision: receive buffer|' \
+    vendor/chiaki-ng/lib/src/takion.c
+fi
+grep -q 'ps5-vision: receive buffer' vendor/chiaki-ng/lib/src/takion.c \
+  || echo "warning: could not enlarge the stream's receive buffer (chiaki-ng changed); the picture may freeze more often on a busy Mac." >&2
+# Receiving the stream is as urgent as anything on screen: tell macOS, so
+# other busy apps don't hold it up.
+if ! grep -q 'ps5-vision: urgent threads' vendor/chiaki-ng/lib/src/thread.c; then
+  perl -0pi -e 's|\tint r = pthread_create\(&thread->thread, NULL, func, arg\);|\t// ps5-vision: urgent threads\n\tpthread_attr_t attr;\n\tpthread_attr_init(&attr);\n#ifdef __APPLE__\n\tpthread_attr_set_qos_class_np(&attr, QOS_CLASS_USER_INTERACTIVE, 0);\n#endif\n\tint r = pthread_create(&thread->thread, &attr, func, arg);\n\tpthread_attr_destroy(&attr);|' \
+    vendor/chiaki-ng/lib/src/thread.c
+fi
+grep -q 'ps5-vision: urgent threads' vendor/chiaki-ng/lib/src/thread.c \
+  || echo "warning: could not raise the stream threads' priority (chiaki-ng changed)." >&2
 
 echo "==> Preparing the protocol code generator"
 # nanopb runs Homebrew's protoc, whose generated Python code only loads with

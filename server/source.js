@@ -3,7 +3,7 @@
 //
 //   'header' (Buffer)            H.264 SPS/PPS, Annex B
 //   'video'  (Buffer, tsUs)      one H.264 access unit, Annex B
-//   'audio'  (Buffer)            one Opus packet
+//   'audio'  (Buffer, tsUs?)     one Opus packet (the test pattern gives no time)
 //   'event'  (object)            { type: 'connected' | 'quit' | 'rumble' | ... }
 //   'log'    (string)            a line of diagnostic output
 //   'exit'   ({ code, signal })  the source is gone for good
@@ -104,7 +104,7 @@ export class ConsoleSource extends EventEmitter {
     const data = Buffer.from(payload.subarray(8));
     if (type === 'V') this.emit('video', data, tsUs);
     else if (type === 'H') this.emit('header', data);
-    else if (type === 'A') this.emit('audio', data);
+    else if (type === 'A') this.emit('audio', data, tsUs);
   }
 
   #send(type, payload) {

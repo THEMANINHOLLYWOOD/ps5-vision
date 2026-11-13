@@ -18,6 +18,24 @@ const AUDIO_CLOCK = 48000;
 const MAX_FRAGMENT_SIZE = 1200;
 const PLAYOUT_DELAY_EXT_ID = 6;
 const PLAYOUT_DELAY_URI = 'http://www.webrtc.org/experiments/rtp-hdrext/playout-delay';
+const DISCONNECT_PATIENCE_MS = 6000;
+
+// Sound is numbered packet by packet, which keeps it gapless however unevenly
+// the packets arrive. But when a stretch of it never comes (the helper leaves
+// out what would only be heard late), the numbering has to skip the same
+// stretch, or everything after it would play that much early against the
+// picture. `state` holds audioSamples (the numbering so far), audioFrameSize
+// and audioBase; returns the number for the packet that arrived at tsUs.
+const AUDIO_GAP_SECONDS = 0.25; // less than this is just uneven arrival
+
+export function nextAudioSamples(state, tsUs) {
+  if (tsUs === undefined) return state.audioSamples;
+  if (!state.audioBase) state.audioBase = { tsUs, samples: state.audioSamples };
+  const due = state.audioBase.samples + ((tsUs - state.audioBase.tsUs) * AUDIO_CLOCK) / 1e6;
+  const missing = due - state.audioSamples;
+  if (missing < AUDIO_GAP_SECONDS * AUDIO_CLOCK) return state.audioSamples;
+  return state.audioSamples + Math.round(missing / state.audioFrameSize) * state.audioFrameSize;
+}
 
 function randomSsrc() {
   return (Math.floor(Math.random() * 0xfffffffe) + 1) >>> 0;
@@ -31,7 +49,8 @@ export class Viewer extends EventEmitter {
     this.ready = false;
     this.needKeyframe = true;
     this.header = null;
-    this.audioTimestamp = Math.floor(Math.random() * 0xffff);
+    this.audioSamples = Math.floor(Math.random() * 0xffff);
+    this.audioBase = null;
     this.audioFrameSize = 480;
     this.videoBytes = 0;
     this.videoFrames = 0;
@@ -95,7 +114,20 @@ export class Viewer extends EventEmitter {
 
     this.pc.onStateChange((state) => {
       this.emit('state', state);
-      if (state === 'failed' || state === 'closed' || state === 'disconnected') this.close();
+      clearTimeout(this.goneTimer);
+      if (state === 'failed' || state === 'closed') {
+        this.close();
+      } else if (state === 'disconnected') {
+        // Nothing heard from the browser for a few seconds: usually a Wi-Fi
+        // hiccup that heals by itself. Give it a moment before letting go.
+        this.goneTimer = setTimeout(() => this.close(), DISCONNECT_PATIENCE_MS);
+        this.emit('stalled');
+      } else if (state === 'connected' && this.ready) {
+        // Back after a hiccup. Whatever was sent meanwhile is lost, so the
+        // picture has to restart from a keyframe.
+        this.resync();
+        this.emit('recovered');
+      }
     });
   }
 
@@ -166,10 +198,12 @@ export class Viewer extends EventEmitter {
     return true;
   }
 
-  pushAudio(packet) {
+  // tsUs: when the packet reached the Mac, if known.
+  pushAudio(packet, tsUs) {
     if (this.closed || !this.audioTrack.isOpen()) return;
-    this.audioConfig.timestamp = this.audioTimestamp;
-    this.audioTimestamp = (this.audioTimestamp + this.audioFrameSize) >>> 0;
+    this.audioSamples = nextAudioSamples(this, tsUs);
+    this.audioConfig.timestamp = this.audioSamples >>> 0;
+    this.audioSamples += this.audioFrameSize;
     try {
       this.audioTrack.sendMessageBinary(packet);
     } catch {
@@ -198,6 +232,7 @@ export class Viewer extends EventEmitter {
     if (this.closed) return;
     this.closed = true;
     this.ready = false;
+    clearTimeout(this.goneTimer);
     try {
       this.pc.close();
     } catch {

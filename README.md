@@ -79,22 +79,36 @@ itself. Choose Show Details > visit this website (Safari) or Advanced > Proceed
 (Chrome). The page then asks, once per device, for the 6-digit **access code**
 that `npm start` printed. Then press **Play**.
 
-Tap or click the picture to bring up the controls:
+Tap or click the picture to bring up the control bar. It leaves again by itself:
 
 | Control | What it does |
 | --- | --- |
+| Signal bars and controller status | Three green bars mean every picture the PS5 sends is reaching the screen; fewer mean some are being lost on the way. Tap for the numbers, and for what to do if no controller is seen. |
 | Volume slider and speaker button | Volume and mute for the device you are playing on. The PS5's own TV sound is not affected; turn the TV down or off. |
-| Refresh | Reconnects the picture in a few seconds if it freezes or lags. The game keeps running. It also happens automatically after a 4-second freeze. |
-| PS, Touchpad | On-screen versions of buttons that browsers often keep for themselves. |
-| Fullscreen | Fills the screen. |
-| Rest mode | Ends the session and puts the PS5 to sleep. |
+| PS | The PS button, which browsers often keep for themselves. |
 | End | Ends the session and leaves the PS5 on. |
-| Buttons | Shows a controller you can click or tap, for when there is no real one. |
-| Keys | Lists the keyboard controls (or press **?**). |
+| ⋯ (More) | Everything used less often, below. |
 
-The start screen lets you pick resolution (up to 1080p), frame rate, and
-whether your Wi-Fi is strong or weak. "Weak" sends a lighter stream that
-glitches less.
+Under **More**:
+
+| Control | What it does |
+| --- | --- |
+| Touchpad press | Presses the controller's touchpad. |
+| On-screen buttons | Shows a controller you can click or tap, for when there is no real one. |
+| Keyboard controls | Lists which keys do what (or press **?**). |
+| Fullscreen | Fills the screen. |
+| Refresh picture | Reconnects the picture in a few seconds if it freezes or lags. The game keeps running. |
+| End and rest PS5 | Ends the session and puts the PS5 to sleep. |
+
+Under **Play**, one line shows the picture settings in use (for example
+"1080p · 60 fps · lighter stream"). Tap it to change resolution (up to 1080p),
+frame rate, and whether your Wi-Fi is strong or weak. "Weak" sends a lighter
+stream that glitches less. The choices are remembered.
+
+Hiccups heal by themselves: a frozen picture is reconnected after 4 seconds,
+a dropped Wi-Fi link is retried for a while before the page gives up, and if
+the PS5 itself stops answering, the bridge connects to it again without you
+doing anything.
 
 ### Start it automatically
 
@@ -126,8 +140,8 @@ No controller needed. While the picture is up, the keyboard is the controller:
 | Left Shift / V | L3 / R3 |
 | O, U, P, Y | Options, Create, PS button, touchpad press |
 
-Or press **Buttons** for a controller you can click; each button stays down
-for as long as you hold it. A real controller works at the same time.
+Or choose **More > On-screen buttons** for a controller you can click; each
+button stays down for as long as you hold it. A real controller works at the same time.
 
 ### Other ways to run it
 
@@ -222,10 +236,17 @@ decides how it feels.
 1. Plug the PS5 into the router with a cable. This helps the most.
 2. Plug the Mac in too (a USB-C Ethernet adapter is enough), or at least keep
    it close to the router on 5 GHz Wi-Fi.
-3. On the start screen choose 720p and "Weak or busy" Wi-Fi.
+3. Under Play, tap the picture settings and choose 720p and "Weak or busy"
+   Wi-Fi.
 4. If you play in a Vision Pro, disconnect Mac Virtual Display while playing,
    and turn off AirDrop and Handoff on the Mac. They share the Mac's Wi-Fi
    radio with the stream.
+5. Give the Mac some room. A Mac that is short of memory or running dozens of
+   browser tabs makes the picture stutter however good the network is. The
+   signal bars tell you which it is: tap them, and if the Mac "sent" fewer
+   pictures than 60 a second, the Mac or the PS5's connection is the weak
+   point; if it sent them all and fewer were shown, it is the link to your
+   screen.
 
 ## What it does not do (yet)
 

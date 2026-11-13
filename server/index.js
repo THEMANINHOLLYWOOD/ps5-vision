@@ -290,6 +290,7 @@ async function main() {
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
+  process.on('SIGHUP', shutdown); // the Terminal window was closed
 }
 
 // One bad request or a helper that won't start must not take the bridge down

@@ -9,6 +9,7 @@
   --accent-ink: #06122e;
   --danger: #ff6b6b;
   --ok: #56d48f;
+  --warn: #f2c14e;
   --radius: 28px;
   /* Eyes-and-pinch input needs larger targets than a mouse does. */
   --target: 60px;
@@ -159,6 +160,26 @@ button.primary {
 }
 button.primary:hover:not(:disabled) { background: #7ba3ff; }
 button.danger { color: var(--danger); }
+button.quiet { background: none; color: var(--ink-quiet); font-weight: 500; font-size: 15px; min-height: 44px; }
+button.quiet:hover:not(:disabled) { background: none; color: var(--ink); }
+
+/* Picture choices, tucked away: the summary line says what is chosen. */
+details { text-align: left; }
+summary {
+  list-style: none;
+  cursor: pointer;
+  text-align: center;
+  font-size: 15px;
+  color: var(--ink-quiet);
+  padding: 10px;
+  border-radius: 999px;
+}
+summary::-webkit-details-marker { display: none; }
+summary::after { content: " ›"; }
+details[open] summary::after { content: " ⌄"; }
+summary:hover { color: var(--ink); }
+summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+#options > * + * { margin-top: 16px; }
 
 .spinner {
   align-self: center;
@@ -176,66 +197,146 @@ button.danger { color: var(--danger); }
 
 /* ---------------------------------------------------------------- HUD */
 
+/* One floating bar, top centre. It covers as little of the game as it can
+   and leaves by itself after a few seconds. */
 #hud {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 20px;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
-}
-
-.hud-group {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 24px);
+  display: grid;
   gap: 10px;
+  animation: hud-in 0.18s ease-out;
+}
+@keyframes hud-in {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #hud { animation: none; }
 }
 
-#hud button {
-  background: var(--surface);
-  border-color: var(--surface-edge);
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
-}
-#hud button:hover { background: rgba(60, 68, 86, 0.85); }
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-radius: 999px;
+.bar, .menu, .details {
   background: var(--surface);
   border: 1px solid var(--surface-edge);
-  font-size: 15px;
-  font-variant-numeric: tabular-nums;
+  -webkit-backdrop-filter: blur(30px) saturate(1.4);
+  backdrop-filter: blur(30px) saturate(1.4);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
-.chip-quiet { color: var(--ink-quiet); }
-.chip-quiet:empty { display: none; }
 
-.volume { padding: 4px 16px 4px 6px; gap: 6px; }
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 999px;
+}
+.bar button {
+  min-height: 52px;
+  padding: 0 18px;
+  background: none;
+  white-space: nowrap;
+}
+.bar button:hover:not(:disabled),
+.bar button[aria-expanded="true"] { background: var(--control); }
+.bar button.icon {
+  width: 52px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  letter-spacing: 0.02em;
+}
+.bar svg, .menu svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+#btn-menu svg { fill: currentColor; stroke: none; }
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 500;
+}
+#pad-indicator[data-on="false"] { color: var(--ink-quiet); }
+
+/* How well the picture is getting through: three bars, like phone signal. */
+.signal {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 16px;
+}
+.signal i {
+  width: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.25);
+}
+.signal i:nth-child(1) { height: 6px; }
+.signal i:nth-child(2) { height: 11px; }
+.signal i:nth-child(3) { height: 16px; }
+.signal[data-level="1"] i:nth-child(-n+1) { background: var(--danger); }
+.signal[data-level="2"] i:nth-child(-n+2) { background: var(--warn); }
+.signal[data-level="3"] i { background: var(--ok); }
+
+.volume {
+  display: flex;
+  align-items: center;
+  padding-right: 10px;
+}
 .volume input[type="range"] {
-  width: 140px;
+  width: 110px;
   min-height: 0;
   padding: 0;
-  accent-color: var(--accent);
+  accent-color: var(--ink);
   background: none;
 }
-#hud .volume button.icon {
-  min-height: 44px;
-  width: 44px;
-  padding: 0;
-  border: none;
-  background: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+#btn-mute .cross { display: none; }
+#btn-mute[data-state="low"] .wave-high,
+#btn-mute[data-state="off"] .wave-high,
+#btn-mute[data-state="off"] .wave-low { display: none; }
+#btn-mute[data-state="off"] .cross { display: inline; }
+
+.details, .menu { border-radius: 24px; }
+.details {
+  justify-self: start;
+  max-width: 100%;
+  padding: 12px 18px;
+  font-size: 14px;
+  color: var(--ink-quiet);
+  font-variant-numeric: tabular-nums;
 }
+.details p { margin: 0; }
+.details p + p { margin-top: 4px; }
+.details p:empty { display: none; }
+
+.menu {
+  justify-self: end;
+  min-width: 260px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+}
+.menu button {
+  min-height: 52px;
+  padding: 0 18px;
+  border-radius: 16px;
+  background: none;
+  text-align: left;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.menu button:hover { background: var(--control); }
+.menu button[aria-pressed="true"]::after { content: "✓"; color: var(--ok); }
+.menu button:last-child { color: var(--danger); }
 
 .toast {
   position: absolute;
@@ -252,14 +353,6 @@ button.danger { color: var(--danger); }
   font-weight: 600;
 }
 
-#pad-indicator::before {
-  content: "";
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--ink-quiet);
-}
-#pad-indicator[data-on="true"]::before { background: var(--ok); }
 
 /* ------------------------------------------------- on-screen controller */
 
@@ -326,6 +419,9 @@ button.danger { color: var(--danger); }
 .keys kbd { font: inherit; }
 
 @media (max-width: 560px) {
+  .volume input[type="range"] { display: none; }
+  .volume { padding-right: 0; }
+  .bar button { padding: 0 12px; }
   #pad { padding: 12px; }
   .pad-cross { grid-template: repeat(3, 46px) / repeat(3, 46px); }
   #pad button { min-height: 46px; min-width: 46px; }
@@ -338,4 +434,4 @@ button.danger { color: var(--danger); }
 /* Inside the Vision Pro app: the window is the screen, and the app reads the
    controller, so browser-only controls are left out. */
 .in-app #btn-fullscreen,
-.in-app #panel-start .note.small:last-child { display: none; }
+.in-app #capture-note { display: none; }

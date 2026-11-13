@@ -68,6 +68,13 @@ if (IN_APP) document.documentElement.classList.add('in-app');
 
 const AUTO_REFRESH_AFTER_S = 4;          // seconds without a new frame
 const AUTO_REFRESH_MIN_GAP_MS = 15_000;  // don't loop if the network is down
+const RECONNECT_TRIES = 5;               // before a reconnect gives up
+const RECONNECT_GAP_MS = 2000;
+const STRUGGLING_AFTER_S = 10;           // of a poor picture, before suggesting a lighter one
+let starvedSamples = 0;
+let poorSamples = 0;
+let strugglingHinted = false;
+let recentFps = [];
 
 // ------------------------------------------------------------------ panels
 
@@ -83,7 +90,10 @@ function showProgress(text) {
 
 function showEnded(message, isError) {
   $('ended-title').textContent = isError ? 'Could not play' : 'Session ended';
-  $('ended-text').textContent = message;
+  // The title already says a plain ending; only add what it doesn't.
+  const text = !isError && /^session ended\.?$/i.test(message) ? '' : message;
+  $('ended-text').textContent = text;
+  $('ended-text').hidden = !text;
   showPanel('panel-ended');
 }
 
@@ -97,8 +107,24 @@ function showHud() {
 // Never pull the controls out from under someone who is using them from
 // the keyboard.
 function hideHudWhenIdle() {
-  if (hud.contains(document.activeElement)) hudTimer = setTimeout(hideHudWhenIdle, HUD_HIDE_MS);
-  else hud.hidden = true;
+  if (hud.contains(document.activeElement)) {
+    hudTimer = setTimeout(hideHudWhenIdle, HUD_HIDE_MS);
+    return;
+  }
+  hud.hidden = true;
+  setOpen('menu', false);
+  setOpen('details', false);
+}
+
+// The two things that drop down from the bar: "More" and connection details.
+const DROPDOWNS = { menu: 'btn-menu', details: 'btn-status' };
+function setOpen(id, open) {
+  $(id).hidden = !open;
+  $(DROPDOWNS[id]).setAttribute('aria-expanded', String(open));
+}
+function toggleDropdown(id) {
+  const open = $(id).hidden;
+  for (const other of Object.keys(DROPDOWNS)) setOpen(other, other === id && open);
 }
 
 // ------------------------------------------------------------------ status
@@ -163,7 +189,7 @@ async function loadStatus() {
   }
   const status = statusCache;
   $('code-row').hidden = !status.needsCode;
-  $('quality-row').hidden = Boolean(status.needsCode);
+  $('options').hidden = Boolean(status.needsCode);
   if (status.needsCode) {
     note.textContent = status.wrongCode
       ? 'That access code is not right. It is the 6-digit number the bridge shows on the Mac.'
@@ -186,7 +212,7 @@ async function loadStatus() {
     play.disabled = false;
     if (IN_APP && !autoPlayed && !$('panel-start').hidden) {
       autoPlayed = true;
-      play.click(); // \`play\` here is the Play button
+      play.click(); // `play` here is the Play button, not the function
     }
   }
 
@@ -197,16 +223,16 @@ function updatePadNote() {
   const status = statusCache ?? {};
   const padNote = $('pad-note');
   if (gamepadsAvailable()) {
-    padNote.textContent = 'Controller: pair it with this device over Bluetooth (not with the PS5: the PS5 ends Remote Play when its own controller turns on), then press any button once playing. No controller? The keyboard works too (press ? while playing), and Buttons shows one you can click.';
+    padNote.textContent = 'Controller: pair it with this device over Bluetooth, not with the PS5 (the PS5 ends Remote Play when its own controller turns on). No controller? The keyboard works too (press ? while playing), and More > On-screen buttons shows one you can click.';
   } else if (status.secureUrl) {
     padNote.innerHTML = '';
     padNote.append('This browser only allows controllers on a secure page. Open ');
     const link = document.createElement('a');
     link.href = status.secureUrl;
     link.textContent = status.secureUrl;
-    padNote.append(link, ' instead. The keyboard and the on-screen Buttons work on this page too.');
+    padNote.append(link, ' instead. The keyboard and the on-screen buttons work on this page too.');
   } else {
-    padNote.textContent = 'This browser does not share game controllers with pages. Play with the keyboard (press ? while playing) or the on-screen Buttons.';
+    padNote.textContent = 'This browser does not share game controllers with pages. Play with the keyboard (press ? while playing) or the on-screen buttons.';
   }
 }
 
@@ -238,11 +264,18 @@ function enterFullscreen() {
   const stage = $('stage');
   if (document.fullscreenElement || document.webkitFullscreenElement) return;
   try {
-    if (stage.requestFullscreen) stage.requestFullscreen().catch(() => {});
+    if (stage.requestFullscreen) stage.requestFullscreen().then(keepEscapeForTheGame).catch(() => {});
     else if (stage.webkitRequestFullscreen) stage.webkitRequestFullscreen();
   } catch {
     // Not allowed here; the Fullscreen button still works.
   }
+}
+
+// Esc is the circle button, but in fullscreen the browser takes it to leave
+// fullscreen. Where the browser can hand it over (Chrome and Edge), a tap of
+// Esc reaches the game and holding it leaves fullscreen.
+function keepEscapeForTheGame() {
+  navigator.keyboard?.lock?.(['Escape']).catch(() => {});
 }
 
 function toggleFullscreen() {
@@ -303,7 +336,7 @@ function applyVolume() {
     video.muted = muted;
     video.volume = level;
   }
-  $('btn-mute').textContent = muted || level === 0 ? '🔇' : level < 0.5 ? '🔉' : '🔊';
+  $('btn-mute').dataset.state = muted || level === 0 ? 'off' : level < 0.5 ? 'low' : 'on';
   $('btn-mute').setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
   try {
     localStorage.setItem('volume', $('volume').value);
@@ -331,7 +364,7 @@ function refresh({ auto = false } = {}) {
 
 let playGeneration = 0;
 
-async function play({ quiet = false } = {}) {
+async function play({ quiet = false, attempt = 1 } = {}) {
   // Each call supersedes any attempt still connecting, so a refresh tapped
   // while another is in flight can't leave two connections fighting.
   teardown(); // also cancels any attempt still in flight
@@ -370,6 +403,12 @@ async function play({ quiet = false } = {}) {
       // The code was changed on the Mac; ask for the new one.
       showPanel('panel-start');
       loadStatus();
+    } else if (quiet && !err.status && attempt < RECONNECT_TRIES) {
+      // A reconnect that got no answer: the Mac is busy or the Wi-Fi is still
+      // out. The game is still running there, so keep trying for a while
+      // rather than giving up on it.
+      showProgress('Reconnecting…');
+      setTimeout(() => { if (current()) play({ quiet: true, attempt: attempt + 1 }); }, RECONNECT_GAP_MS);
     } else {
       showEnded(err.message, true);
     }
@@ -410,11 +449,12 @@ async function play({ quiet = false } = {}) {
   connection.addEventListener('connectionstatechange', () => {
     if (pc !== connection) return;
     if (connection.connectionState === 'failed') lost();
-    // "disconnected" often heals itself within a second or two; give it that.
+    // "disconnected" often heals itself within a few seconds, and the Mac
+    // waits a little longer than this before letting go of its end.
     else if (connection.connectionState === 'disconnected') {
       setTimeout(() => {
         if (['disconnected', 'failed'].includes(connection.connectionState)) lost();
-      }, 2000);
+      }, 4000);
     }
   });
 
@@ -454,6 +494,7 @@ function onControl(connection, raw) {
         showPanel($('panel-tap').hidden ? null : 'panel-tap');
         updatePad();
         showHud();
+        hintAboutInput();
       } else if (PROGRESS_TEXT[message.state]) {
         showProgress(PROGRESS_TEXT[message.state]);
       }
@@ -502,6 +543,12 @@ function teardown() {
   serverStats = previousVideoStats = null;
   stalledSamples = 0;
   frozenSamples = 0;
+  starvedSamples = 0;
+  poorSamples = 0;
+  recentFps = [];
+  $('signal').dataset.level = '0';
+  setOpen('menu', false);
+  setOpen('details', false);
   virtualButtons = 0;
   releaseAllInput();
   updatePad();
@@ -535,13 +582,27 @@ function activeGamepad() {
 
 // Why no controller is visible, in words the player can act on.
 function padProblem() {
-  if (!window.isSecureContext) return 'Keyboard only: open the https:// address to use a controller';
-  if (!gamepadsAvailable()) return 'Keyboard only: this browser does not share controllers with pages';
-  return 'No controller seen yet: press a button on it, or use the keyboard (?)';
+  if (!window.isSecureContext) return 'Keyboard only: open the https:// address to use a controller.';
+  if (!gamepadsAvailable()) return 'Keyboard only: this browser does not share controllers with pages.';
+  return 'No controller seen yet: press a button on it, or press ? for keyboard controls.';
 }
 
 function nativeInput(now) {
   return nativeState && now - nativeStateAt < NATIVE_INPUT_STALE_MS ? nativeState : null;
+}
+
+// Once per visit, a few seconds into playing with nothing to play with: say
+// what the options are, instead of leaving a picture that ignores everyone.
+let inputHinted = false;
+function hintAboutInput() {
+  if (inputHinted) return;
+  const generation = playGeneration;
+  setTimeout(() => {
+    const idle = !activeGamepad() && !nativeInput(performance.now()) && !keyboardUsed && !padWanted;
+    if (inputHinted || generation !== playGeneration || !streaming || !idle) return;
+    inputHinted = true;
+    showToast(padProblem(), 6000);
+  }, 3000);
 }
 
 function pollController() {
@@ -549,10 +610,12 @@ function pollController() {
   const now = performance.now();
   const native = nativeInput(now);
   const indicator = $('pad-indicator');
-  const label = gamepad || native ? 'Controller connected' : keyboardUsed ? 'Keyboard (press ? for keys)' : padProblem();
+  const label = gamepad || native ? 'Controller' : keyboardUsed ? 'Keyboard' : 'No controller';
   if (indicator.textContent !== label) {
     indicator.dataset.on = String(Boolean(gamepad || native || keyboardUsed));
     indicator.textContent = label;
+    // The longer explanation is one tap away, under the status.
+    $('pad-hint').textContent = gamepad || native ? '' : keyboardUsed ? 'Press ? to see which keys do what.' : padProblem();
     showHud();
   }
   if (inputChannel?.readyState !== 'open') return;
@@ -587,7 +650,8 @@ function sendDiag() {
 // in text fields, and Enter or Space on a focused control presses that control.
 function onKeyDown(event) {
   const guideOpen = !$('keys').hidden;
-  if (event.key === '?' || (guideOpen && event.code === 'Escape')) {
+  const asksForGuide = event.key === '?' || (event.code === 'Slash' && event.shiftKey);
+  if (asksForGuide || (guideOpen && event.code === 'Escape')) {
     if (streaming || guideOpen) {
       event.preventDefault();
       toggleKeyGuide();
@@ -734,6 +798,27 @@ function rumble(left, right) {
 
 // ------------------------------------------------------------------- stats
 
+// The three bars in the corner of the bar: how much of the picture the PS5
+// sends is actually reaching the screen, averaged over a few seconds so a
+// single hiccup doesn't make them flicker.
+function updateSignal(decodedFps, packetsLost) {
+  if (!streaming) return;
+  recentFps.push(decodedFps);
+  if (recentFps.length > 3) recentFps.shift();
+  const wanted = Number($('opt-fps').value) || 60;
+  const share = recentFps.reduce((sum, fps) => sum + fps, 0) / recentFps.length / wanted;
+  const level = share >= 0.85 && packetsLost === 0 ? 3 : share >= 0.6 ? 2 : 1;
+  $('signal').dataset.level = String(level);
+  $('btn-status').title = ['', 'Poor connection', 'Fair connection', 'Good connection'][level];
+
+  poorSamples = level === 1 ? poorSamples + 1 : 0;
+  if (poorSamples >= STRUGGLING_AFTER_S && !strugglingHinted) {
+    strugglingHinted = true; // once per visit is enough
+    const lighter = Number($('opt-res').value) > 720 ? '720p' : $('opt-net').value === 'strong' ? 'the lighter Wi-Fi setting' : '30 fps';
+    showToast(`The connection is struggling. End, then choose ${lighter} under Picture for a smoother game.`, 8000);
+  }
+}
+
 async function sampleStats(connection) {
   if (pc !== connection) return;
   sendDiag();
@@ -762,18 +847,27 @@ async function sampleStats(connection) {
     stalledSamples = 0;
     sendControl({ type: 'keyframe' });
   }
+  // The Mac itself is getting no picture from the PS5. Reconnecting this page
+  // to the Mac would not help; say what is happening and wait for it.
+  const macStarved = streaming && serverStats?.fps === 0;
+  starvedSamples = macStarved ? starvedSamples + 1 : 0;
+  if (starvedSamples === 3) showToast('Waiting for the PS5: its connection to the Mac dropped out…', 5000);
   // No new picture for several seconds even after asking for a keyframe:
   // reconnect, at most once every 15 seconds.
-  frozenSamples = streaming && decoded === 0 ? frozenSamples + 1 : 0;
+  frozenSamples = streaming && decoded === 0 && !macStarved ? frozenSamples + 1 : 0;
   if (frozenSamples >= AUTO_REFRESH_AFTER_S && Date.now() - lastAutoRefresh > AUTO_REFRESH_MIN_GAP_MS) {
     frozenSamples = 0;
     refresh({ auto: true });
     return;
   }
+  updateSignal(decoded, (inbound.packetsLost ?? 0) - (previous.packetsLost ?? 0));
 
   const parts = [];
   if (inbound.frameWidth) parts.push(`${inbound.frameHeight}p`);
-  parts.push(`${decoded} fps`);
+  // When fewer frames are shown than the Mac passed on, the loss is between
+  // the Mac and this screen; when the Mac got few itself, it is at the PS5.
+  const sent = serverStats?.fps;
+  parts.push(Number.isFinite(sent) && Math.abs(sent - decoded) > 6 ? `${decoded} fps shown, ${sent} sent by the Mac` : `${decoded} fps`);
   parts.push(`${((bytes * 8) / 1e6).toFixed(1)} Mbps`);
   const emitted = (inbound.jitterBufferEmittedCount ?? 0) - (previous.jitterBufferEmittedCount ?? 0);
   if (emitted > 0) {
@@ -791,6 +885,11 @@ async function sampleStats(connection) {
 
 $('btn-play').addEventListener('click', () => play());
 $('btn-again').addEventListener('click', () => play());
+$('btn-settings').addEventListener('click', () => {
+  showPanel('panel-start');
+  $('options').open = true;
+  loadStatus();
+});
 $('btn-refresh').addEventListener('click', () => refresh());
 $('volume').addEventListener('input', () => {
   muted = false;
@@ -831,6 +930,12 @@ $('btn-end').addEventListener('click', () => stopSession(false));
 $('btn-rest').addEventListener('click', () => stopSession(true));
 $('btn-ps').addEventListener('click', () => tapVirtual(BUTTON.PS));
 $('btn-touchpad').addEventListener('click', () => tapVirtual(BUTTON.TOUCHPAD));
+$('btn-menu').addEventListener('click', () => toggleDropdown('menu'));
+$('btn-status').addEventListener('click', () => toggleDropdown('details'));
+// Choosing something from "More" puts the menu away again.
+$('menu').addEventListener('click', (event) => {
+  if (event.target instanceof Element && event.target.closest('button')) setOpen('menu', false);
+});
 $('btn-fullscreen').addEventListener('click', toggleFullscreen);
 $('btn-pad').addEventListener('click', togglePad);
 $('btn-keys').addEventListener('click', toggleKeyGuide);
@@ -872,8 +977,16 @@ for (const id of ['opt-res', 'opt-fps', 'opt-net']) {
   }
   select.addEventListener('change', () => {
     try { localStorage.setItem(id, select.value); } catch { /* see above */ }
+    summarizeOptions();
   });
 }
+
+// What is chosen, on the closed "Picture" line: no need to open it to check.
+function summarizeOptions() {
+  const net = $('opt-net').value === 'weak' ? 'lighter stream' : 'sharpest picture';
+  $('options-summary').textContent = `${$('opt-res').value}p · ${$('opt-fps').value} fps · ${net}`;
+}
+summarizeOptions();
 
 showPanel('panel-start');
 loadStatus();

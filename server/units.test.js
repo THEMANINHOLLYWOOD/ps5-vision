@@ -7,6 +7,7 @@ import { OggOpusReader } from './ogg.js';
 import { broadcastAddresses, findLinkedConsole, locateConsole, parseDiscoveryResponse, wakeCredential } from './discovery.js';
 import { describeQuit, normalizeOptions } from './bridge.js';
 import { txtRecord } from './bonjour.js';
+import { nextAudioSamples } from './viewer.js';
 import { BUTTON, encodeState, idleState, readGamepad, statesEqual } from '../web/controller.js';
 import { KEY_GUIDE, KEY_MAP, isMappedKey, keyboardState, mergeStates } from '../web/keyboard.js';
 
@@ -395,4 +396,31 @@ test('Bonjour TXT entries are printable key=value strings that fit', () => {
   assert.deepEqual(txtRecord({ scheme: 'https', console: 'PS5-287', empty: '', gone: undefined }), ['scheme=https', 'console=PS5-287']);
   assert.equal(txtRecord({ name: 'Café\n' })[0], 'name=Caf');
   assert.equal(txtRecord({ long: 'x'.repeat(400) })[0].length, 255);
+});
+
+// ------------------------------------------------------------------ sound
+
+test('sound stays gapless through uneven arrival, and skips what never came', () => {
+  const state = { audioSamples: 1000, audioFrameSize: 480, audioBase: null };
+  const push = (tsUs) => {
+    state.audioSamples = nextAudioSamples(state, tsUs);
+    const numbered = state.audioSamples;
+    state.audioSamples += state.audioFrameSize;
+    return numbered;
+  };
+  // Packets 10 ms apart are numbered one frame apart.
+  assert.equal(push(0), 1000);
+  assert.equal(push(10_000), 1480);
+  // A busy moment: three arrive together, 60 ms late. Still gapless.
+  assert.equal(push(80_000), 1960);
+  assert.equal(push(80_100), 2440);
+  assert.equal(push(80_200), 2920);
+  // Two seconds were left out: the numbering jumps by the same two seconds.
+  const before = state.audioSamples;
+  const after = push(2_100_000);
+  assert.ok(Math.abs((after - before) - 2 * 48000) < 4800, `jumped ${after - before} samples`);
+  assert.equal((after - 1000) % 480, 0);
+  assert.equal(push(2_110_000), after + 480);
+  // No time given (the test pattern): plain counting.
+  assert.equal(nextAudioSamples({ audioSamples: 7, audioFrameSize: 480, audioBase: null }, undefined), 7);
 });

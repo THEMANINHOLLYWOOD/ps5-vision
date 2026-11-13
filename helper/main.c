@@ -61,17 +61,94 @@ static volatile sig_atomic_t g_stop_requested = 0;
 
 // ---------------------------------------------------------------- utilities
 
-static void log_cb(ChiakiLogLevel level, const char *msg, void *user)
-{
-	(void)user;
-	fprintf(stderr, "[%c] %s\n", chiaki_log_level_char(level), msg);
-}
-
 static uint64_t now_us(void)
 {
 	struct timespec ts;
 	clock_gettime(CLOCK_MONOTONIC, &ts);
 	return (uint64_t)ts.tv_sec * 1000000ull + (uint64_t)ts.tv_nsec / 1000ull;
+}
+
+// On a bad connection chiaki reports every lost packet on its own line:
+// hundreds a second. They are written from the threads that receive the
+// stream, to a pipe the bridge empties no faster than its window can print,
+// so writing them all stalls the stream, which loses more packets, which
+// logs more. Each kind of message is therefore written once a second, with a
+// count of how many more like it there were.
+#define LOG_KINDS 24
+#define LOG_KIND_PREFIX 20 // messages of one kind differ in the numbers after this
+#define LOG_WINDOW_US 1000000ull
+
+typedef struct
+{
+	char prefix[LOG_KIND_PREFIX + 1];
+	char level;
+	unsigned repeats; // beyond the first, which was written at once
+} LogKind;
+
+static pthread_mutex_t g_log_mutex = PTHREAD_MUTEX_INITIALIZER;
+static LogKind g_log_kinds[LOG_KINDS];
+static size_t g_log_kind_count = 0;
+static unsigned g_log_other = 0; // messages beyond LOG_KINDS different kinds
+static uint64_t g_log_window_start = 0;
+static bool g_log_everything = false; // --verbose
+
+// Call with g_log_mutex held.
+static void log_summarize(void)
+{
+	for(size_t i = 0; i < g_log_kind_count; i++)
+	{
+		if(g_log_kinds[i].repeats)
+			fprintf(stderr, "[%c] %s... (%u more like this in the last second)\n",
+				g_log_kinds[i].level, g_log_kinds[i].prefix, g_log_kinds[i].repeats);
+	}
+	if(g_log_other)
+		fprintf(stderr, "[W] ...and %u other messages\n", g_log_other);
+	g_log_kind_count = 0;
+	g_log_other = 0;
+}
+
+static void log_cb(ChiakiLogLevel level, const char *msg, void *user)
+{
+	(void)user;
+	char level_char = chiaki_log_level_char(level);
+	if(g_log_everything)
+	{
+		fprintf(stderr, "[%c] %s\n", level_char, msg);
+		return;
+	}
+	// chiaki dumps the bytes of messages it doesn't know, without saying what
+	// they are: a header row, then rows starting with an offset. Noise here.
+	const char *text = msg;
+	while(*text == ' ')
+		text++;
+	if(strncmp(msg, "offset ", 7) == 0 || (text != msg && strspn(text, "0123456789abcdef") > 0 && text[strspn(text, "0123456789abcdef")] == ' '))
+		return;
+	pthread_mutex_lock(&g_log_mutex);
+	uint64_t now = now_us();
+	if(now - g_log_window_start >= LOG_WINDOW_US)
+	{
+		log_summarize();
+		g_log_window_start = now;
+	}
+	LogKind *kind = NULL;
+	for(size_t i = 0; i < g_log_kind_count && !kind; i++)
+	{
+		if(strncmp(g_log_kinds[i].prefix, msg, LOG_KIND_PREFIX) == 0)
+			kind = &g_log_kinds[i];
+	}
+	if(kind)
+		kind->repeats++;
+	else if(g_log_kind_count < LOG_KINDS)
+	{
+		kind = &g_log_kinds[g_log_kind_count++];
+		snprintf(kind->prefix, sizeof(kind->prefix), "%s", msg);
+		kind->level = level_char;
+		kind->repeats = 0;
+		fprintf(stderr, "[%c] %s\n", level_char, msg);
+	}
+	else
+		g_log_other++;
+	pthread_mutex_unlock(&g_log_mutex);
 }
 
 static int hex_nibble(char c)
@@ -174,34 +251,125 @@ static bool write_all(int fd, const uint8_t *buf, size_t size)
 	return true;
 }
 
-// Writes one frame: type, length, optional 8-byte timestamp prefix, payload.
+// Frames go to the parent through a queue with a thread of its own, so the
+// threads that receive the stream never wait for the parent to read. If they
+// did, a parent that is busy for a moment (a slow viewer, a busy Mac) would
+// stop the stream being received and acknowledged, the console would resend
+// everything, and one hiccup would turn into a frozen picture.
+typedef struct OutFrame
+{
+	struct OutFrame *next;
+	uint64_t queued_at;
+	size_t size;
+	uint8_t data[];
+} OutFrame;
+
+#define OUT_BEHIND_BYTES (3u * 1024 * 1024) // about 2 seconds of video
+#define OUT_BEHIND_US 500000ull              // or frames waiting this long
+#define OUT_GIVE_UP_BYTES (32u * 1024 * 1024) // the parent is not reading at all
+
+static OutFrame *g_out_head = NULL;
+static OutFrame *g_out_tail = NULL;
+static size_t g_out_bytes = 0;
+static bool g_out_closing = false;
+static bool g_out_broken = false; // the parent is gone; nothing more is written
+static pthread_cond_t g_out_cond = PTHREAD_COND_INITIALIZER;
+
+// More is waiting to be written than a viewer could still use.
+static bool out_behind(void)
+{
+	pthread_mutex_lock(&g_out_mutex);
+	bool behind = g_out_bytes > OUT_BEHIND_BYTES
+		|| (g_out_head && now_us() - g_out_head->queued_at > OUT_BEHIND_US);
+	pthread_mutex_unlock(&g_out_mutex);
+	return behind;
+}
+
+static void *writer_thread(void *user)
+{
+	(void)user;
+	pthread_mutex_lock(&g_out_mutex);
+	while(true)
+	{
+		while(!g_out_head && !g_out_closing)
+			pthread_cond_wait(&g_out_cond, &g_out_mutex);
+		OutFrame *frame = g_out_head;
+		if(!frame)
+			break; // closing, and everything has been written
+		g_out_head = frame->next;
+		if(!g_out_head)
+			g_out_tail = NULL;
+		g_out_bytes -= frame->size;
+		bool write_it = !g_out_broken;
+		pthread_mutex_unlock(&g_out_mutex);
+
+		bool ok = !write_it || write_all(STDOUT_FILENO, frame->data, frame->size);
+		free(frame);
+
+		pthread_mutex_lock(&g_out_mutex);
+		if(!ok)
+		{
+			// Parent went away: nothing left to stream to. Only leave a note;
+			// the command thread does the stopping.
+			g_out_broken = true;
+			g_stop_requested = 1;
+		}
+	}
+	pthread_mutex_unlock(&g_out_mutex);
+	return NULL;
+}
+
+// Writes whatever is still queued (the reason the session ended, above all)
+// and ends the writer.
+static void out_close(pthread_t writer)
+{
+	pthread_mutex_lock(&g_out_mutex);
+	g_out_closing = true;
+	pthread_cond_signal(&g_out_cond);
+	pthread_mutex_unlock(&g_out_mutex);
+	pthread_join(writer, NULL);
+}
+
+// Queues one frame: type, length, optional 8-byte timestamp prefix, payload.
 static void emit(char type, bool with_ts, const uint8_t *payload, size_t payload_size)
 {
-	uint8_t head[13];
+	size_t head_size = with_ts ? 13 : 5;
+	OutFrame *frame = malloc(sizeof(OutFrame) + head_size + payload_size);
+	if(!frame)
+		return;
 	uint32_t len = (uint32_t)(payload_size + (with_ts ? 8 : 0));
+	uint8_t *head = frame->data;
 	head[0] = (uint8_t)type;
 	head[1] = (uint8_t)(len & 0xff);
 	head[2] = (uint8_t)((len >> 8) & 0xff);
 	head[3] = (uint8_t)((len >> 16) & 0xff);
 	head[4] = (uint8_t)((len >> 24) & 0xff);
-	size_t head_size = 5;
+	frame->queued_at = now_us();
 	if(with_ts)
 	{
-		uint64_t ts = now_us();
 		for(int i = 0; i < 8; i++)
-			head[5 + i] = (uint8_t)((ts >> (8 * i)) & 0xff);
-		head_size = 13;
+			head[5 + i] = (uint8_t)((frame->queued_at >> (8 * i)) & 0xff);
 	}
+	if(payload_size)
+		memcpy(frame->data + head_size, payload, payload_size);
+	frame->size = head_size + payload_size;
+	frame->next = NULL;
 
 	pthread_mutex_lock(&g_out_mutex);
-	bool ok = write_all(STDOUT_FILENO, head, head_size) && write_all(STDOUT_FILENO, payload, payload_size);
+	if(g_out_broken || g_out_bytes > OUT_GIVE_UP_BYTES)
+	{
+		pthread_mutex_unlock(&g_out_mutex);
+		free(frame);
+		return;
+	}
+	if(g_out_tail)
+		g_out_tail->next = frame;
+	else
+		g_out_head = frame;
+	g_out_tail = frame;
+	g_out_bytes += frame->size;
+	pthread_cond_signal(&g_out_cond);
 	pthread_mutex_unlock(&g_out_mutex);
-
-	// Parent went away: nothing left to stream to. This runs inside chiaki's
-	// callbacks, some of which hold the locks that stopping needs, so only
-	// leave a note; the command thread does the stopping.
-	if(!ok)
-		g_stop_requested = 1;
 }
 
 static void emit_event(const char *fmt, ...)
@@ -220,6 +388,11 @@ static void emit_event(const char *fmt, ...)
 
 // ------------------------------------------------------------------ stream
 
+// Set while pictures are being left out because the parent is behind; the
+// next one that can be shown on its own (a keyframe) ends it.
+static bool g_video_skipping = false;
+static uint64_t g_video_skip_told_at = 0;
+
 static bool video_cb(uint8_t *buf, size_t buf_size, int32_t frames_lost, bool frame_recovered, void *user)
 {
 	(void)user;
@@ -229,6 +402,7 @@ static bool video_cb(uint8_t *buf, size_t buf_size, int32_t frames_lost, bool fr
 	// chiaki delivers the SPS/PPS as its own "sample" whenever the profile changes;
 	// those contain no slice NAL. Tell the parent which is which.
 	bool has_slice = false;
+	bool keyframe = false;
 	for(size_t i = 0; i + 3 < buf_size; i++)
 	{
 		if(buf[i] == 0 && buf[i + 1] == 0 && buf[i + 2] == 1)
@@ -237,9 +411,32 @@ static bool video_cb(uint8_t *buf, size_t buf_size, int32_t frames_lost, bool fr
 			if(nal_type == 1 || nal_type == 5)
 			{
 				has_slice = true;
+				keyframe = nal_type == 5;
 				break;
 			}
 			i += 2;
+		}
+	}
+	if(has_slice)
+	{
+		// Pictures the parent would only get late are worth nothing: leave
+		// them out until it has caught up, then start again from a keyframe
+		// (each picture builds on the one before, so there is no resuming
+		// half way). The parent is told, so it can ask the console for one.
+		bool behind = out_behind();
+		if(g_video_skipping && keyframe && !behind)
+			g_video_skipping = false;
+		else if(behind)
+			g_video_skipping = true;
+		if(g_video_skipping)
+		{
+			uint64_t now = now_us();
+			if(!behind && now - g_video_skip_told_at > 700000ull)
+			{
+				g_video_skip_told_at = now;
+				emit_event("{\"type\":\"video_skipped\"}");
+			}
+			return true;
 		}
 	}
 	emit(has_slice ? 'V' : 'H', true, buf, buf_size);
@@ -256,6 +453,10 @@ static void audio_header_cb(ChiakiAudioHeader *header, void *user)
 static void audio_frame_cb(uint8_t *buf, size_t buf_size, void *user)
 {
 	(void)user;
+	// Sound that would be heard late is left out too; its timestamp lets the
+	// parent keep what follows in step with the picture.
+	if(out_behind())
+		return;
 	emit('A', true, buf, buf_size);
 }
 
@@ -495,8 +696,11 @@ static int cmd_stream(int argc, char **argv)
 	signal(SIGINT, on_stop_signal);
 	signal(SIGTERM, on_stop_signal);
 
+	pthread_t writer;
+	bool have_writer = pthread_create(&writer, NULL, writer_thread, NULL) == 0;
+
 	pthread_t reader;
-	bool have_reader = pthread_create(&reader, NULL, stdin_thread, NULL) == 0;
+	bool have_reader = have_writer && pthread_create(&reader, NULL, stdin_thread, NULL) == 0;
 	if(!have_reader)
 		chiaki_session_stop(&g_session);
 
@@ -511,6 +715,8 @@ static int cmd_stream(int argc, char **argv)
 	if(have_reader)
 		pthread_detach(reader);
 	chiaki_session_fini(&g_session);
+	if(have_writer)
+		out_close(writer);
 	return 0;
 }
 
@@ -616,7 +822,10 @@ int main(int argc, char **argv)
 	if(strcmp(argv[1], "stream") == 0)
 		mask = CHIAKI_LOG_WARNING | CHIAKI_LOG_ERROR;
 	if(arg_flag(argc, argv, "--verbose"))
+	{
 		mask = CHIAKI_LOG_ALL & ~CHIAKI_LOG_DEBUG;
+		g_log_everything = true;
+	}
 	chiaki_log_init(&g_log, mask, log_cb, NULL);
 
 	ChiakiErrorCode err = chiaki_lib_init();

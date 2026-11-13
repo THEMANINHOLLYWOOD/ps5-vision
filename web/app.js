@@ -67,6 +67,23 @@ const nativeBridge = () => window.webkit?.messageHandlers?.ps5;
 let autoPlayed = false;
 if (IN_APP) document.documentElement.classList.add('in-app');
 
+// H.265 (HEVC) is used when the browser lists it among what it can receive.
+// If it then turns out not to draw anything (some list it and cannot), the
+// page goes back to H.264 by itself and remembers, see sampleStats.
+let usingHevc = false;
+let hevcFailed = false;
+try { hevcFailed = localStorage.getItem('hevc-failed') === '1'; } catch { /* try it */ }
+let hevcSilentSamples = 0;
+
+function hevcWanted() {
+  if (hevcFailed) return false;
+  try {
+    return RTCRtpReceiver.getCapabilities('video').codecs.some((codec) => /h265|hevc/i.test(codec.mimeType));
+  } catch {
+    return false;
+  }
+}
+
 // Safari, which is what a Vision Pro or iPad runs. Its fullscreen there is a
 // separate presentation that can keep a game controller (and the keyboard)
 // from reaching the page, and a Vision Pro's Safari cannot be told apart
@@ -98,7 +115,14 @@ function showProgress(text) {
   showPanel('panel-progress');
 }
 
+let loadedVersion = null;
+let lastView = null;
+
 function showEnded(message, isError) {
+  // A good moment to pick up a newer page, if the bridge has one.
+  api('/api/status').then((status) => {
+    if (status.version && loadedVersion && status.version !== loadedVersion && !streaming && !pc) location.reload();
+  }).catch(() => {});
   $('ended-title').textContent = isError ? 'Could not play' : 'Session ended';
   // The title already says a plain ending; only add what it doesn't.
   const text = !isError && /^session ended\.?$/i.test(message) ? '' : message;
@@ -188,6 +212,15 @@ async function loadStatus() {
   clearTimeout(statusRetryTimer);
   try {
     statusCache = await api('/api/status');
+    // The bridge was updated since this page was loaded: get the new page.
+    // Only ever between games, where a reload costs nothing.
+    if (statusCache.version) {
+      if (!loadedVersion) loadedVersion = statusCache.version;
+      else if (loadedVersion !== statusCache.version && !streaming && !pc) {
+        location.reload();
+        return;
+      }
+    }
   } catch (err) {
     note.textContent = err.status ? err.message : 'The bridge on your Mac is not answering. Is it still running?';
     play.disabled = true;
@@ -404,7 +437,14 @@ async function play({ quiet = false, attempt = 1 } = {}) {
   // A lighter stream means fewer packets per frame, so a Wi-Fi hiccup is less
   // likely to break a frame (and freeze the picture until the next keyframe).
   // The console's own defaults are 15 Mbps at 1080p and 10 Mbps at 720p.
-  if ($('opt-net').value === 'weak') options.bitrate = { 1080: 8000, 720: 5000, 540: 3000 }[res] ?? 0;
+  // H.265 where this browser can show it: the same picture in about two
+  // thirds of the data. That is either a sharper picture or fewer packets for
+  // the Wi-Fi to lose; the lighter setting takes the second.
+  usingHevc = hevcWanted();
+  options.codec = usingHevc ? 'h265' : 'h264';
+  if ($('opt-net').value === 'weak') {
+    options.bitrate = (usingHevc ? { 1080: 6000, 720: 4000, 540: 2500 } : { 1080: 8000, 720: 5000, 540: 3000 })[res] ?? 0;
+  }
   let offer;
   try {
     offer = await api('/api/connect', options);
@@ -665,6 +705,7 @@ function sendDiag() {
     secure: window.isSecureContext,
     api: gamepadsAvailable(),
     pads,
+    view: lastView, // what reached the screen in the last second
     pressed: pad ? pad.buttons.filter((button) => button.pressed).length : 0,
     touch: TOUCH_SAFARI,
     touchPoints: navigator.maxTouchPoints,
@@ -1166,6 +1207,18 @@ async function sampleStats(connection) {
   const bytes = (inbound.bytesReceived ?? 0) - (previous.bytesReceived ?? 0);
   // Data is arriving but nothing is being drawn: the decoder has lost its
   // place (or never found it). A fresh keyframe gets it going again.
+  // H.265 arriving for three seconds with nothing ever drawn: this browser
+  // cannot show it after all. Use H.264 from now on.
+  hevcSilentSamples = usingHevc && streaming && bytes > 0 && !(inbound.framesDecoded > 0) ? hevcSilentSamples + 1 : 0;
+  if (hevcSilentSamples >= 3) {
+    hevcSilentSamples = 0;
+    hevcFailed = true;
+    try { localStorage.setItem('hevc-failed', '1'); } catch { /* tried again next visit */ }
+    showToast('Switching to the standard picture format…');
+    play({ quiet: true });
+    return;
+  }
+  lastView = { fps: decoded, lost: (inbound.packetsLost ?? 0) - (previous.packetsLost ?? 0) };
   stalledSamples = streaming && bytes > 0 && decoded === 0 ? stalledSamples + 1 : 0;
   if (stalledSamples >= 2 || (inbound.pliCount ?? 0) > (previous.pliCount ?? 0)) {
     stalledSamples = 0;
@@ -1188,7 +1241,7 @@ async function sampleStats(connection) {
   watchConsoleLink();
 
   const parts = [];
-  if (inbound.frameWidth) parts.push(`${inbound.frameHeight}p`);
+  if (inbound.frameWidth) parts.push(`${inbound.frameHeight}p${usingHevc ? ' H.265' : ''}`);
   // When fewer frames are shown than the Mac passed on, the loss is between
   // the Mac and this screen; when the Mac got few itself, it is at the PS5.
   const sent = serverStats?.fps;
@@ -1341,7 +1394,11 @@ window.addEventListener('keydown', onKeyDown);
 window.addEventListener('keyup', onKeyUp);
 // A key let go while another window had focus never reports its release.
 window.addEventListener('blur', releaseAllInput);
-document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAllInput(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) releaseAllInput();
+  // Coming back to the page between games: check for a newer one.
+  else if (!streaming && !pc && !$('panel-start').hidden) loadStatus();
+});
 window.addEventListener('gamepadconnected', (event) => {
   loadStatus();
   // Say so: until now the only sign was a word changing in the bar.

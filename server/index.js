@@ -38,6 +38,20 @@ const STATIC_FILES = {
 };
 const MAX_BODY = 256 * 1024;
 
+// Changes whenever any file of the page does, so an open page can tell that
+// it is out of date and load the new one.
+function pageVersion() {
+  let newest = 0;
+  for (const [file] of Object.values(STATIC_FILES)) {
+    try {
+      newest = Math.max(newest, fs.statSync(path.join(WEB_DIR, file)).mtimeMs);
+    } catch {
+      // a file being rewritten this instant; the next check sees it
+    }
+  }
+  return String(Math.round(newest));
+}
+
 function parseArgs(argv) {
   const args = { demo: false, port: 8080, httpsPort: 8443, https: true, verbose: false, local: false, open: false, code: true };
   for (let i = 0; i < argv.length; i++) {
@@ -154,7 +168,7 @@ function createHandler(bridge, info, log) {
         // Without the code, say only that one is needed (and whether the one
         // offered was wrong), nothing about the console.
         if (code !== 'ok') sendJson(res, 200, { needsCode: true, wrongCode: code === 'wrong' });
-        else sendJson(res, 200, { ...bridge.status(), helperBuilt: info.helperBuilt(), secureUrl: info.secureUrl });
+        else sendJson(res, 200, { ...bridge.status(), helperBuilt: info.helperBuilt(), secureUrl: info.secureUrl, version: pageVersion() });
         return;
       }
       if (code !== 'ok') {

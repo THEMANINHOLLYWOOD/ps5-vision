@@ -28,7 +28,7 @@ function forwardLines(stream, emitter) {
 
 // A real console, reached through the ps5-helper binary.
 export class ConsoleSource extends EventEmitter {
-  constructor({ helperPath, console: target, res = 1080, fps = 60, bitrate = 0, verbose = false }) {
+  constructor({ helperPath, console: target, res = 1080, fps = 60, bitrate = 0, codec = 'h264', verbose = false }) {
     super();
     this.args = [
       'stream',
@@ -40,6 +40,7 @@ export class ConsoleSource extends EventEmitter {
     // users of this machine could read them from the process list.
     this.env = { ...process.env, PS5_REGIST_KEY: target.registKey, PS5_MORNING: target.morning };
     if (bitrate > 0) this.args.push('--bitrate', String(bitrate));
+    if (codec === 'h265') this.args.push('--codec', 'h265');
     if (!target.ps5) this.args.push('--ps4');
     if (verbose) this.args.push('--verbose');
     this.helperPath = helperPath;

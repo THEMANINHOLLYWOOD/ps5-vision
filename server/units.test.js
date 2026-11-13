@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { FrameParser, encodeFrame } from './framing.js';
-import { AccessUnitSplitter, hasParameterSets, isKeyframe, nalTypes } from './h264.js';
+import { AccessUnitSplitter, hasParameterSets, hevcNalTypes, isKeyframe, nalTypes } from './h264.js';
 import { OggOpusReader } from './ogg.js';
 import { broadcastAddresses, findLinkedConsole, locateConsole, parseDiscoveryResponse, wakeCredential } from './discovery.js';
 import { consoleEndedIt, describeQuit, normalizeOptions, shouldRejoin } from './bridge.js';
@@ -160,10 +160,10 @@ test('broadcast addresses follow each interface netmask', () => {
 // ---------------------------------------------------------------- bridge
 
 test('stream options fall back to safe values', () => {
-  assert.deepEqual(normalizeOptions({}), { res: 1080, fps: 60, bitrate: 0 });
-  assert.deepEqual(normalizeOptions({ res: 720, fps: 30, bitrate: 8000 }), { res: 720, fps: 30, bitrate: 8000 });
-  assert.deepEqual(normalizeOptions({ res: 4320, fps: 240, bitrate: 9e9 }), { res: 1080, fps: 60, bitrate: 50000 });
-  assert.deepEqual(normalizeOptions({ res: 'x', fps: null, bitrate: 'lots' }), { res: 1080, fps: 60, bitrate: 0 });
+  assert.deepEqual(normalizeOptions({}), { res: 1080, fps: 60, bitrate: 0, codec: 'h264' });
+  assert.deepEqual(normalizeOptions({ res: 720, fps: 30, bitrate: 8000, codec: 'h265' }), { res: 720, fps: 30, bitrate: 8000, codec: 'h265' });
+  assert.deepEqual(normalizeOptions({ res: 4320, fps: 240, bitrate: 9e9, codec: 'av9' }), { res: 1080, fps: 60, bitrate: 50000, codec: 'h264' });
+  assert.deepEqual(normalizeOptions({ res: 'x', fps: null, bitrate: 'lots' }), { res: 1080, fps: 60, bitrate: 0, codec: 'h264' });
 });
 
 test('known session failures get a plain-language explanation', () => {
@@ -612,4 +612,19 @@ test('a Mac sending its own screen over Wi-Fi is noticed', () => {
   assert.equal(wirelessDisplayIn(builtIn), null);
   assert.equal(wirelessDisplayIn({ SPDisplaysDataType: [{ spdisplays_ndrvs: [{ _name: 'Living Room TV', spdisplays_connection_type: 'spdisplays_airplay' }] }] }), 'AirPlay');
   assert.equal(wirelessDisplayIn(null), null);
+});
+
+test('H.265 keyframes and parameter sets are told from ordinary pictures', () => {
+  const nal = (type, ...rest) => Buffer.from([0, 0, 0, 1, type << 1, 1, ...rest]);
+  const parameters = Buffer.concat([nal(32), nal(33), nal(34)]);
+  const key = nal(19, 0xaf); // IDR_W_RADL
+  const ordinary = nal(1, 0x02);
+  assert.deepEqual(hevcNalTypes(Buffer.concat([parameters, key])), [32, 33, 34, 19]);
+  assert.ok(isKeyframe(key, true));
+  assert.ok(isKeyframe(nal(21), true), 'a clean random access picture also starts a decoder');
+  assert.ok(!isKeyframe(ordinary, true));
+  assert.ok(hasParameterSets(Buffer.concat([parameters, key]), true));
+  assert.ok(!hasParameterSets(key, true));
+  // Read as H.264, the same bytes mean something else: the flag matters.
+  assert.ok(!isKeyframe(key, false));
 });

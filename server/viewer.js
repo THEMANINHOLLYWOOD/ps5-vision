@@ -42,9 +42,11 @@ function randomSsrc() {
 }
 
 export class Viewer extends EventEmitter {
-  constructor({ id, portRangeBegin, portRangeEnd } = {}) {
+  // codec: 'h264', or 'h265' for a browser that said it can show it.
+  constructor({ id, codec = 'h264', portRangeBegin, portRangeEnd } = {}) {
     super();
     this.id = id;
+    this.hevc = codec === 'h265';
     this.closed = false;
     this.ready = false;
     this.needKeyframe = true;
@@ -64,7 +66,8 @@ export class Viewer extends EventEmitter {
     // for High profile and rejects the other's. Their decoders go by the
     // stream itself, so the console's High profile video plays regardless.
     const video = new ndc.Video('video', 'SendOnly');
-    video.addH264Codec(VIDEO_PAYLOAD_TYPE, 'profile-level-id=42e01f;packetization-mode=1;level-asymmetry-allowed=1');
+    if (this.hevc) video.addH265Codec(VIDEO_PAYLOAD_TYPE);
+    else video.addH264Codec(VIDEO_PAYLOAD_TYPE, 'profile-level-id=42e01f;packetization-mode=1;level-asymmetry-allowed=1');
     const videoSsrc = randomSsrc();
     video.addSSRC(videoSsrc, 'ps5', 'ps5-stream', 'ps5-video');
     // Ask the browser to show frames the moment they arrive instead of
@@ -75,7 +78,9 @@ export class Viewer extends EventEmitter {
     this.videoConfig.playoutDelayId = PLAYOUT_DELAY_EXT_ID;
     this.videoConfig.playoutDelayMin = 0;
     this.videoConfig.playoutDelayMax = 0;
-    const videoPacketizer = new ndc.H264RtpPacketizer('StartSequence', this.videoConfig, MAX_FRAGMENT_SIZE);
+    const videoPacketizer = this.hevc
+      ? new ndc.H265RtpPacketizer('StartSequence', this.videoConfig, MAX_FRAGMENT_SIZE)
+      : new ndc.H264RtpPacketizer('StartSequence', this.videoConfig, MAX_FRAGMENT_SIZE);
     videoPacketizer.addToChain(new ndc.RtcpSrReporter(this.videoConfig));
     // Remembers recent packets so the browser can ask for ones Wi-Fi dropped.
     videoPacketizer.addToChain(new ndc.RtcpNackResponder(4096));
@@ -180,12 +185,12 @@ export class Viewer extends EventEmitter {
   // waiting for a keyframe.
   pushVideo(unit, tsUs) {
     if (this.closed || !this.videoTrack.isOpen()) return false;
-    const key = isKeyframe(unit);
+    const key = isKeyframe(unit, this.hevc);
     if (this.needKeyframe && !key) return false;
     let payload = unit;
     // A decoder can only start on a keyframe that comes with its SPS/PPS; the
     // console sends those once, out of band, so re-attach them here.
-    if (key && this.header && !hasParameterSets(unit)) payload = Buffer.concat([this.header, unit]);
+    if (key && this.header && !hasParameterSets(unit, this.hevc)) payload = Buffer.concat([this.header, unit]);
     this.videoConfig.timestamp = Math.floor((tsUs * VIDEO_CLOCK) / 1e6) >>> 0;
     try {
       this.videoTrack.sendMessageBinary(payload);

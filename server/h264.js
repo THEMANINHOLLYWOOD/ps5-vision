@@ -19,11 +19,30 @@ export function nalTypes(buf) {
   return types;
 }
 
-export function isKeyframe(buf) {
+// The same for H.265 (HEVC), which keeps the type in other bits of the header.
+export function hevcNalTypes(buf) {
+  const types = [];
+  for (let i = 0; i + 3 < buf.length; i++) {
+    if (buf[i] === 0 && buf[i + 1] === 0 && buf[i + 2] === 1) {
+      types.push((buf[i + 3] >> 1) & 0x3f);
+      i += 2;
+    }
+  }
+  return types;
+}
+
+// hevc: the buffer is H.265 rather than H.264.
+export function isKeyframe(buf, hevc = false) {
+  // H.265 types 16 to 21 are the pictures a decoder can start from.
+  if (hevc) return hevcNalTypes(buf).some((type) => type >= 16 && type <= 21);
   return nalTypes(buf).includes(NAL_IDR);
 }
 
-export function hasParameterSets(buf) {
+export function hasParameterSets(buf, hevc = false) {
+  if (hevc) {
+    const types = hevcNalTypes(buf);
+    return types.includes(32) && types.includes(33) && types.includes(34); // VPS, SPS, PPS
+  }
   const types = nalTypes(buf);
   return types.includes(NAL_SPS) && types.includes(NAL_PPS);
 }

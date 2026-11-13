@@ -109,6 +109,12 @@ Under **Play**, one line shows the picture settings in use (for example
 frame rate, and whether your Wi-Fi is strong or weak. "Weak" sends a lighter
 stream that glitches less. The choices are remembered.
 
+The picture is sent as H.265 when your browser can show it (current Safari
+and Chrome can) and as H.264 otherwise. H.265 gives the same picture in about
+two thirds of the data, so there is less for the Wi-Fi to lose; the details
+under the signal bars say which is in use. An open page also notices when the
+bridge has been updated and loads the new version between games.
+
 Hiccups heal by themselves: a frozen picture is reconnected after 4 seconds,
 a dropped Wi-Fi link is retried for a while before the page gives up, and if
 the PS5 itself stops answering, the bridge connects to it again without you

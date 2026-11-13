@@ -405,6 +405,7 @@ static void emit_event(const char *fmt, ...)
 
 // Set while pictures are being left out because the parent is behind; the
 // next one that can be shown on its own (a keyframe) ends it.
+static bool g_hevc = false; // the stream is H.265, not H.264
 static bool g_video_skipping = false;
 static uint64_t g_video_skip_told_at = 0;
 
@@ -422,12 +423,27 @@ static bool video_cb(uint8_t *buf, size_t buf_size, int32_t frames_lost, bool fr
 	{
 		if(buf[i] == 0 && buf[i + 1] == 0 && buf[i + 2] == 1)
 		{
-			uint8_t nal_type = buf[i + 3] & 0x1f;
-			if(nal_type == 1 || nal_type == 5)
+			// A picture (as opposed to the parameters that describe the stream),
+			// and whether it is one a decoder can start from.
+			if(g_hevc)
 			{
-				has_slice = true;
-				keyframe = nal_type == 5;
-				break;
+				uint8_t nal_type = (buf[i + 3] >> 1) & 0x3f;
+				if(nal_type <= 21)
+				{
+					has_slice = true;
+					keyframe = nal_type >= 16;
+					break;
+				}
+			}
+			else
+			{
+				uint8_t nal_type = buf[i + 3] & 0x1f;
+				if(nal_type == 1 || nal_type == 5)
+				{
+					has_slice = true;
+					keyframe = nal_type == 5;
+					break;
+				}
 			}
 			i += 2;
 		}
@@ -671,7 +687,11 @@ static int cmd_stream(int argc, char **argv)
 	ChiakiVideoFPSPreset fps_preset = (fps && atoi(fps) == 30) ? CHIAKI_VIDEO_FPS_PRESET_30 : CHIAKI_VIDEO_FPS_PRESET_60;
 	chiaki_connect_video_profile_preset(&info.video_profile, res_preset, fps_preset);
 	// Browsers decode H.264 over WebRTC everywhere; H.265 is not reliably available.
-	info.video_profile.codec = CHIAKI_CODEC_H264;
+	// H.265 where the viewer's browser can show it: the same picture in about
+	// two thirds of the data, so fewer packets for the Wi-Fi to lose.
+	const char *codec = arg_value(argc, argv, "--codec");
+	g_hevc = codec && strcmp(codec, "h265") == 0;
+	info.video_profile.codec = g_hevc ? CHIAKI_CODEC_H265 : CHIAKI_CODEC_H264;
 	if(bitrate && atoi(bitrate) > 0)
 		info.video_profile.bitrate = (unsigned int)atoi(bitrate);
 	info.video_profile_auto_downgrade = true;

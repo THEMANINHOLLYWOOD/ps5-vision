@@ -69,7 +69,8 @@ export function normalizeOptions(raw = {}) {
   const res = RESOLUTIONS.includes(Number(raw.res)) ? Number(raw.res) : 1080;
   const fps = Number(raw.fps) === 30 ? 30 : 60;
   const bitrate = Number.isFinite(Number(raw.bitrate)) ? Math.max(0, Math.min(50_000, Math.round(Number(raw.bitrate)))) : 0;
-  return { res, fps, bitrate };
+  const codec = raw.codec === 'h265' ? 'h265' : 'h264';
+  return { res, fps, bitrate, codec };
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -127,12 +128,13 @@ export class Bridge {
   async connect(rawOptions) {
     if (!this.demo && !this.console) throw Object.assign(new Error('No PS5 is linked yet. Run: npm run link'), { status: 409 });
     const options = normalizeOptions(rawOptions);
+    if (this.demo) options.codec = 'h264'; // all the test pattern comes in
 
     if (this.viewer) {
       this.viewer.sendControl({ type: 'replaced' });
       this.viewer.close();
     }
-    const viewer = new Viewer({ id: this.nextViewerId++ });
+    const viewer = new Viewer({ id: this.nextViewerId++, codec: options.codec });
     this.viewer = viewer;
     viewer.on('open', () => {
       this.#attach(viewer, options).catch((err) => {
@@ -182,7 +184,8 @@ export class Bridge {
     const sameSettings = this.sourceOptions
       && this.sourceOptions.res === options.res
       && this.sourceOptions.fps === options.fps
-      && this.sourceOptions.bitrate === options.bitrate;
+      && this.sourceOptions.bitrate === options.bitrate
+      && this.sourceOptions.codec === options.codec;
 
     // A source that is on its way out can't be picked up; wait for it to go
     // and start a fresh one.
@@ -242,6 +245,7 @@ export class Bridge {
           this.lastDiag = line;
           this.log(line);
         }
+        this.#noteView(message.view);
         // Buttons going down and up are not worth a line each: say once that
         // presses are getting through.
         if (Number(message.pressed) > 0 && !viewer.pressSeen) {
@@ -359,7 +363,8 @@ export class Bridge {
         });
       }
     });
-    this.log(this.demo ? 'starting test pattern' : `connecting to ${this.console.name} at ${this.console.host}`);
+    this.log(this.demo ? 'starting test pattern'
+      : `connecting to ${this.console.name} at ${this.console.host} (${options.res}p, ${options.codec === 'h265' ? 'H.265' : 'H.264'}${options.bitrate ? `, ${options.bitrate} kbps` : ''})`);
     this.letSleep?.();
     this.letSleep = keepAwake(); // until this session ends
     source.start();
@@ -460,6 +465,22 @@ export class Bridge {
           .catch((err) => this.log(`could not reconnect to the console: ${err.stack ?? err.message}`));
       }, RETRY_BUSY_GAP_MS);
     });
+  }
+
+  // What reached the viewer's screen, second by second, summed up in one line
+  // every quarter minute: enough to tell which leg of the trip is losing it.
+  #noteView(view) {
+    if (!view || !this.sourceConnected) return;
+    this.views ??= [];
+    this.views.push({ fps: Number(view.fps) || 0, lost: Number(view.lost) || 0, framesLost: this.framesLost });
+    if (this.views.length < 15) return;
+    const shown = this.views.map((second) => second.fps);
+    const average = Math.round(shown.reduce((sum, fps) => sum + fps, 0) / shown.length);
+    const fromConsole = Math.max(0, this.views.at(-1).framesLost - this.views[0].framesLost);
+    const toScreen = this.views.reduce((sum, second) => sum + second.lost, 0);
+    this.log(`last 15 s: ${average} pictures a second on screen (worst second ${Math.min(...shown)}); `
+      + `lost ${fromConsole} pictures between the PS5 and this Mac, ${toScreen} packets between this Mac and the screen`);
+    this.views = [];
   }
 
   // Every half minute while a game is streaming.

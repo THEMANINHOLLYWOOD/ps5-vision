@@ -147,11 +147,11 @@ try {
   // storage unavailable; the code is asked for again next visit
 }
 
-async function api(path, body) {
+async function api(path, body, timeoutMs = API_TIMEOUT_MS) {
   // Give up on a bridge that doesn't answer rather than waiting on the
   // network's own (very long) timeout.
   const abort = new AbortController();
-  const timer = setTimeout(() => abort.abort(), API_TIMEOUT_MS);
+  const timer = setTimeout(() => abort.abort(), timeoutMs);
   const headers = {};
   if (accessCode) headers['x-access-code'] = accessCode;
   if (body !== undefined) headers['content-type'] = 'application/json';
@@ -207,6 +207,7 @@ async function loadStatus() {
     play.disabled = true;
     return;
   }
+  loadBuiltLayouts();
   $('mode-badge').hidden = status.mode !== 'demo';
   $('console-name').textContent = status.name || 'PS5';
   if (!status.linked) {
@@ -523,6 +524,7 @@ function onControl(connection, raw) {
       break;
     case 'stats':
       serverStats = message;
+      noteSharing(message.sharing);
       break;
     case 'rumble':
       rumble(message.left, message.right);
@@ -679,7 +681,8 @@ function sendDiag() {
 // in text fields, and Enter or Space on a focused control presses that control.
 function onKeyDown(event) {
   const guideOpen = !$('keys').hidden;
-  const asksForGuide = event.key === '?' || (event.code === 'Slash' && event.shiftKey);
+  const typing = event.target instanceof Element && event.target.closest('input, textarea');
+  const asksForGuide = !typing && (event.key === '?' || (event.code === 'Slash' && event.shiftKey));
   if (asksForGuide || (guideOpen && event.code === 'Escape')) {
     if (streaming || guideOpen) {
       event.preventDefault();
@@ -797,16 +800,98 @@ function fillKeyGuide() {
 let layout = LAYOUTS[0];
 let keyMap = compileLayout(layout);
 
-function useLayout(id) {
-  layout = findLayout(id);
+// Layouts built for particular games, kept on the Mac (see server/layouts.js).
+let builtLayouts = [];
+
+function fillLayoutChoices() {
+  const select = $('layout');
+  select.replaceChildren();
+  for (const choice of [...LAYOUTS, ...builtLayouts]) select.add(new Option(choice.name, choice.id));
+  select.value = layout.id;
+}
+
+function useLayout(id, { remember = true } = {}) {
+  layout = findLayout(id, builtLayouts);
   keyMap = compileLayout(layout);
-  try { localStorage.setItem('layout', layout.id); } catch { /* not remembered */ }
+  if (remember) {
+    try { localStorage.setItem('layout', layout.id); } catch { /* not remembered */ }
+  }
   releaseAllInput();
   if (!layout.mouseLook && document.pointerLockElement) document.exitPointerLock();
   $('layout').value = layout.id;
   $('layout-about').textContent = layout.about;
   $('mouse-row').hidden = !layout.mouseLook;
   fillKeyGuide();
+}
+
+function savedLayoutId() {
+  try { return localStorage.getItem('layout'); } catch { return null; }
+}
+
+let layoutsLoaded = false;
+async function loadBuiltLayouts() {
+  if (layoutsLoaded) return;
+  let data;
+  try {
+    data = await api('/api/layouts');
+  } catch {
+    return; // the built-in layouts are enough to play
+  }
+  layoutsLoaded = true;
+  builtLayouts = Array.isArray(data.layouts) ? data.layouts : [];
+  $('build-row').hidden = !data.canBuild;
+  fillLayoutChoices();
+  // The layout chosen last time may be one of these.
+  const saved = savedLayoutId();
+  if (saved && saved !== layout.id && builtLayouts.some((built) => built.id === saved)) useLayout(saved);
+}
+
+// A picture of what the PS5 is showing, small enough to send.
+function screenPicture() {
+  if (!streaming || !video.videoWidth) return null;
+  const scale = Math.min(1, 1280 / video.videoWidth);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(video.videoWidth * scale);
+  canvas.height = Math.round(video.videoHeight * scale);
+  try {
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.72);
+  } catch {
+    return null;
+  }
+}
+
+// Has Claude, on the Mac, lay out the keyboard for the game on screen (or
+// the one named), the way a PC player of that game would expect it.
+async function buildForGame() {
+  const note = (text) => {
+    $('build-note').textContent = text;
+    $('build-note').hidden = !text;
+  };
+  const name = $('game-name').value.trim();
+  const image = name ? null : screenPicture();
+  if (!name && !image) {
+    note('Start playing first, or type the game\'s name.');
+    return;
+  }
+  $('btn-build').disabled = true;
+  note(name ? `Working out the controls for ${name}… about half a minute.` : 'Looking at your screen to see which game this is… about half a minute.');
+  try {
+    const built = await api('/api/layouts', name ? { name } : { image }, 150_000);
+    if (!built.recognized && !name) {
+      note('Could not tell which game this is. Type its name, then build again.');
+      return;
+    }
+    builtLayouts = [built.layout, ...builtLayouts.filter((other) => other.id !== built.layout.id)];
+    useLayout(built.layout.id);
+    fillLayoutChoices();
+    $('game-name').value = '';
+    note(`Controls for ${built.layout.name} are ready, and saved for next time.`);
+  } catch (err) {
+    note(err.message);
+  } finally {
+    $('btn-build').disabled = false;
+  }
 }
 
 // A key or mouse button going down and up, and one that is only tapped
@@ -978,14 +1063,29 @@ function rumble(left, right) {
 
 // ------------------------------------------------------------------- stats
 
+// The Mac sending its own screen over Wi-Fi at the same time (Mac Virtual
+// Display, Sidecar, AirPlay) is the commonest cause of a laggy game: say so,
+// once, and keep it in the connection details for as long as it lasts.
+let sharingTold = false;
+function noteSharing(sharing) {
+  const text = sharing
+    ? `Your Mac is also sending its own screen over Wi-Fi (${sharing}). That makes the game lag: disconnect it while you play.`
+    : '';
+  if ($('link-hint').textContent !== text) $('link-hint').textContent = text;
+  if (sharing && !sharingTold && streaming) {
+    sharingTold = true;
+    showToast(text, 12_000);
+  }
+}
+
 // When the PS5's own link to the Mac keeps losing pictures, each loss is a
 // short freeze, and no amount of reconnecting helps: there is simply more
 // picture than the Wi-Fi carries. A lighter picture gets through, so step
 // down by itself (lighter stream first, then lower resolution), say so, and
 // remember it; "Picture" on the start screen changes it back.
-const LINK_WINDOW_S = 30;
-const LINK_BAD_SECONDS = 3;    // seconds with pictures lost, out of the last 30
-const LINK_BAD_FRAMES = 12;
+const LINK_WINDOW_S = 60;
+const LINK_BAD_SECONDS = 2;    // seconds with pictures lost, out of the last 60
+const LINK_BAD_FRAMES = 6;
 const STEP_DOWN_GAP_MS = 60_000;
 const LOWER_RESOLUTION = { 1080: '720', 720: '540' };
 let lostPerSecond = [];
@@ -1171,10 +1271,14 @@ hud.addEventListener('click', (event) => {
   if (event.detail > 0 && event.target instanceof Element) event.target.closest('button')?.blur();
 });
 wirePad();
-for (const choice of LAYOUTS) $('layout').add(new Option(choice.name, choice.id));
-let savedLayout = null;
-try { savedLayout = localStorage.getItem('layout'); } catch { /* the first one */ }
-useLayout(savedLayout);
+fillLayoutChoices();
+// Not remembered yet: the saved choice may be a layout built for a game,
+// which is only known once the bridge has answered (loadBuiltLayouts).
+useLayout(savedLayoutId(), { remember: false });
+$('btn-build').addEventListener('click', buildForGame);
+$('game-name').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') buildForGame();
+});
 $('layout').addEventListener('change', () => useLayout($('layout').value));
 $('mouse-speed').value = String(mouseSpeed);
 $('mouse-speed').addEventListener('input', () => {

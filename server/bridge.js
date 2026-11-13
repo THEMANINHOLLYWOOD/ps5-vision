@@ -6,6 +6,7 @@ import { Viewer } from './viewer.js';
 import { CONTROLLER_STATE_SIZE, ConsoleSource, DemoSource } from './source.js';
 import { discover, locateConsole, wakeup } from './discovery.js';
 import { keepAwake } from './awake.js';
+import { wirelessDisplay } from './sharing.js';
 
 const RESOLUTIONS = [360, 540, 720, 1080];
 const IDLE_STOP_MS = 10_000;
@@ -26,6 +27,7 @@ const BUSY_TRIES = 3; // retries when nothing says a session of ours just died
 // PS5's own controller plays the game being watched. Not more than a few
 // times in a row, in case the console really does not want us.
 const REJOIN_GAP_MS = 2500;
+const SHARING_CHECK_MS = 30_000;
 const REJOIN_LIMIT = 3;
 const REJOIN_WINDOW_MS = 120_000;
 
@@ -75,7 +77,9 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 export class Bridge {
   // `reach` replaces how the console is found and connected to; tests use it.
   constructor({ demo = false, console: target = null, helperPath, verbose = false, log = () => {}, onConsoleMoved = () => {}, reach = {} }) {
-    this.reach = { locate: locateConsole, discover, createSource: null, ...reach };
+    this.reach = { locate: locateConsole, discover, createSource: null, wirelessDisplay, ...reach };
+    this.sharing = null; // this Mac's own screen going out over Wi-Fi (see sharing.js)
+    this.sharingCheckedAt = 0;
     this.rejoinTries = 0;
     this.demo = demo;
     this.console = target;
@@ -231,11 +235,18 @@ export class Bridge {
         // The text comes from the browser: keep it short and printable.
         const line = (`browser: secure=${Boolean(message.secure)} gamepadApi=${Boolean(message.api)} `
           + `touch=${Boolean(message.touch)} fullscreen=${Boolean(message.fullscreen)} focused=${Boolean(message.focused)} `
-          + `app=${Boolean(message.app)} touchPoints=${Number(message.touchPoints) || 0} ua="${String(message.ua ?? '').slice(0, 140)}" pads=${JSON.stringify(message.pads ?? []).slice(0, 300)} pressed=${Number(message.pressed) || 0}`)
+          + `app=${Boolean(message.app)} touchPoints=${Number(message.touchPoints) || 0} ua="${String(message.ua ?? '').slice(0, 140)}" `
+          + `pads=${JSON.stringify(message.pads ?? []).slice(0, 300)}`)
           .replace(/[^\x20-\x7e]/g, '?');
         if (line !== this.lastDiag) {
           this.lastDiag = line;
           this.log(line);
+        }
+        // Buttons going down and up are not worth a line each: say once that
+        // presses are getting through.
+        if (Number(message.pressed) > 0 && !viewer.pressSeen) {
+          viewer.pressSeen = true;
+          this.log('the browser sees controller buttons being pressed');
         }
         break;
       }
@@ -254,6 +265,7 @@ export class Bridge {
   #sendStats() {
     const viewer = this.viewer;
     this.#checkSource(); // may let go of a session that has died
+    this.#checkSharing();
     if (!viewer?.ready || !this.source) {
       this.lastStatsAt = null; // don't average the next sample over the gap
       return;
@@ -277,6 +289,7 @@ export class Bridge {
       fps: Math.round(videoFrames / seconds),
       inputHz: Math.round(inputPackets / seconds),
       framesLost: this.framesLost,
+      sharing: this.sharing,
     });
   }
 
@@ -447,6 +460,20 @@ export class Bridge {
           .catch((err) => this.log(`could not reconnect to the console: ${err.stack ?? err.message}`));
       }, RETRY_BUSY_GAP_MS);
     });
+  }
+
+  // Every half minute while a game is streaming.
+  #checkSharing() {
+    if (!this.source || Date.now() - this.sharingCheckedAt < SHARING_CHECK_MS) return;
+    this.sharingCheckedAt = Date.now();
+    this.reach.wirelessDisplay().then((sharing) => {
+      if (sharing !== this.sharing) {
+        this.log(sharing
+          ? `this Mac is also sending its own screen over Wi-Fi (${sharing}); the game will lag and stutter until that is disconnected`
+          : 'this Mac is no longer sending its own screen over Wi-Fi');
+      }
+      this.sharing = sharing;
+    }).catch(() => {});
   }
 
   #mayRejoin() {

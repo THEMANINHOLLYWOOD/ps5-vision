@@ -438,6 +438,18 @@ summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .keys table { border-collapse: collapse; text-align: left; font-size: 15px; }
 .keys input[type="range"] { min-height: 32px; padding: 0; accent-color: var(--accent); background: none; }
 .keys select { min-height: 52px; }
+.build { display: flex; gap: 10px; }
+.build button { min-height: 52px; white-space: nowrap; background: var(--accent); color: var(--accent-ink); }
+.build button:hover:not(:disabled) { background: #7ba3ff; }
+.build input.text {
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  text-align: left;
+  font-size: 16px;
+  letter-spacing: 0;
+}
+.keys #build-note { text-align: left; }
 .keys #layout-about { text-align: left; }
 .keys td { padding: 6px 8px; border-top: 1px solid var(--surface-edge); }
 .keys td:first-child { white-space: nowrap; font-weight: 600; }

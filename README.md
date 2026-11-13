@@ -147,6 +147,17 @@ which keys do what. Three come built in, and your choice is remembered:
 In every layout the arrow keys, Enter and Backspace work the PS5's own menus,
 and every controller button has a key.
 
+**Build for this game** makes a layout for whatever you are playing. The
+bridge sends a picture of the screen to Claude, which works out which game it
+is and lays out the keys the way a PC player of that game would expect, with
+what each button does in that game ("reload", "jump"). It takes about twenty
+seconds, is saved on the Mac, and then shows up in the Layout list on every
+device. You can also type the game's name instead. This needs
+[Claude Code](https://claude.com/claude-code) installed and signed in on the
+Mac that runs the bridge; it uses that login, so there is no API key to set
+up. Whatever Claude answers is checked before use: only real keys and buttons
+are kept, and anything it left out is given a key.
+
 The picture itself can be clicked like a desktop app: click (or tap, or pinch
 on a Vision Pro) selects, right-click goes back, and the scroll wheel or a
 drag moves the highlight. The PS5 has no pointer of its own, so a click
@@ -234,6 +245,7 @@ can make the scan), and add the resulting `.referenceobject` file to the app.
 | What you see | What to do |
 | --- | --- |
 | The picture pauses when you pick up the controller | The controller is connected to the PS5, which ends Remote Play when its own controller turns on. The bridge joins again by itself within a few seconds, and that controller keeps working. |
+| The game lags although the network is good | Check the signal bars' details on the page. If they say the Mac is sending its own screen over Wi-Fi, disconnect Mac Virtual Display, Sidecar or AirPlay while you play. |
 | A controller paired with the headset or laptop isn't seen | Just pressing PS reconnects a DualSense to the PS5, not to your device. Put it in pairing mode (hold **Create + PS** until the light flashes fast), pick it in the device's Bluetooth settings, then press a button with the page in front. |
 | The page says the access code is not right | Use the code from the bridge's window on the Mac (the line starting "Access code"). After many wrong tries, wait a minute. |
 | "No controller" stays grey | Use the `https://` address; browsers hide controllers from plain `http://` pages. Press any button once the stream is up. |
@@ -257,7 +269,9 @@ decides how it feels.
    Wi-Fi.
 4. If you play in a Vision Pro, disconnect Mac Virtual Display while playing,
    and turn off AirDrop and Handoff on the Mac. They share the Mac's Wi-Fi
-   radio with the stream.
+   radio with the stream, and Mac Virtual Display alone is enough to make a
+   game lag and stutter. The bridge notices when the Mac is sending its own
+   screen over Wi-Fi and says so on the page.
 5. Give the Mac some room. A Mac that is short of memory or running dozens of
    browser tabs makes the picture stutter however good the network is. The
    signal bars tell you which it is: tap them, and if the Mac "sent" fewer

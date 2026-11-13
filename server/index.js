@@ -22,6 +22,7 @@ import { AttemptLimiter, codesMatch, hostAllowed, isLoopback, loadOrCreateAccess
 import { ROOT, CONFIG_DIR, HELPER_PATH, loadConsole, saveConsole } from './config.js';
 import { bonjourName, ensureCertificate, localAddresses } from './tls.js';
 import { advertise } from './bonjour.js';
+import { LayoutStore, MAX_IMAGE_BYTES, buildLayout, findClaude } from './layouts.js';
 import { X509Certificate } from 'node:crypto';
 
 const WEB_DIR = path.join(ROOT, 'web');
@@ -67,13 +68,13 @@ function sendJson(res, status, body) {
   res.end(data);
 }
 
-function readJson(req) {
+function readJson(req, maxBody = MAX_BODY) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
     req.on('data', (chunk) => {
       size += chunk.length;
-      if (size > MAX_BODY) {
+      if (size > maxBody) {
         reject(Object.assign(new Error('request too large'), { status: 413 }));
         req.destroy();
         return;
@@ -179,6 +180,48 @@ function createHandler(bridge, info, log) {
         sendJson(res, 200, { ok: true });
         return;
       }
+      if (req.method === 'GET' && url.pathname === '/api/layouts') {
+        sendJson(res, 200, { canBuild: Boolean(info.claudePath), layouts: info.layouts.list() });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/layouts') {
+        if (!info.claudePath) {
+          sendJson(res, 503, { error: 'Building a layout needs Claude Code on the Mac that runs the bridge. Install it from claude.com/claude-code, sign in once, and start the bridge again.' });
+          return;
+        }
+        if (info.building) {
+          sendJson(res, 429, { error: 'A layout is already being built. Give it a minute.' });
+          return;
+        }
+        // A picture of the screen is far bigger than anything else sent here.
+        const body = await readJson(req, Math.ceil(MAX_IMAGE_BYTES * 1.4) + 4096);
+        let image = null;
+        if (typeof body.image === 'string' && body.image) {
+          image = Buffer.from(body.image.replace(/^data:image\/jpeg;base64,/, ''), 'base64');
+          const isJpeg = image.length > 3 && image[0] === 0xff && image[1] === 0xd8 && image[2] === 0xff;
+          if (!isJpeg || image.length > MAX_IMAGE_BYTES) {
+            sendJson(res, 400, { error: 'The picture of the screen could not be used.' });
+            return;
+          }
+        }
+        if (!image && !(typeof body.name === 'string' && body.name.trim())) {
+          sendJson(res, 400, { error: 'Type the game\'s name, or start playing so the bridge can look at the screen.' });
+          return;
+        }
+        info.building = true;
+        try {
+          log(`building a keyboard layout${body.name ? ` for "${String(body.name).replace(/[^\x20-\x7e]/g, '?').slice(0, 60)}"` : ' from the screen'}`);
+          const built = await buildLayout({ claudePath: info.claudePath, store: info.layouts, image, gameName: body.name });
+          log(`layout ready: ${built.layout.name}${built.recognized ? '' : ' (game not recognized)'}`);
+          sendJson(res, 200, built);
+        } catch (err) {
+          log(`could not build a layout: ${err.message}`);
+          sendJson(res, 502, { error: 'Claude could not build a layout just now. The bridge\'s window on the Mac says why.' });
+        } finally {
+          info.building = false;
+        }
+        return;
+      }
       sendJson(res, 404, { error: 'not found' });
     } catch (err) {
       // Errors with a status were written for the person at the browser.
@@ -229,6 +272,10 @@ async function main() {
     // Local mode only listens to this machine, which never needs the code.
     accessCode: args.code && !args.local ? loadOrCreateAccessCode(path.join(CONFIG_DIR, 'access-code')) : null,
     limiter: new AttemptLimiter(),
+    // Keyboard layouts built for particular games, and what builds them.
+    layouts: new LayoutStore(path.join(CONFIG_DIR, 'layouts.json')),
+    claudePath: findClaude(),
+    building: false,
   };
 
   const handler = createHandler(bridge, info, log);

@@ -130,8 +130,69 @@ export const LAYOUTS = Object.freeze([
   },
 ]);
 
-export function findLayout(id) {
-  return LAYOUTS.find((layout) => layout.id === id) ?? LAYOUTS[0];
+// `more`: layouts built for particular games (see sanitizeLayout).
+export function findLayout(id, more = []) {
+  return [...LAYOUTS, ...more].find((layout) => layout.id === id) ?? LAYOUTS[0];
+}
+
+// ---- Layouts built for one game
+//
+// The bridge can ask Claude to lay out the keyboard for whatever game is on
+// screen. What comes back is a suggestion from outside this code, so it is
+// only ever used after going through sanitizeLayout: unknown keys and targets
+// are dropped, and whatever it left unreachable is filled in.
+
+// Keys such a layout may use. Not here: the keys every layout already has
+// (arrows, Enter, Backspace), Esc (the browser's key for letting go of the
+// mouse), "/" (with Shift it opens the guide), and Ctrl, Alt and Cmd.
+export const BINDABLE_KEYS = Object.freeze([
+  ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((letter) => `Key${letter}`),
+  ...'0123456789'.split('').map((digit) => `Digit${digit}`),
+  'Space', 'Tab', 'ShiftLeft', 'ShiftRight', 'CapsLock', 'Backquote', 'Minus', 'Equal',
+  'BracketLeft', 'BracketRight', 'Semicolon', 'Quote', 'Comma', 'Period',
+]);
+export const MOUSE_KEYS = Object.freeze(['Mouse0', 'Mouse1', 'Mouse2', 'WheelUp', 'WheelDown']);
+
+function plainText(value, max) {
+  return String(value ?? '')
+    .replace(/[\s\p{Cc}]+/gu, ' ') // line breaks and the like separate words
+    .replace(/[^\p{L}\p{N}\p{P}\p{Zs}+]/gu, '') // symbols such as (R) and (TM) just go
+    .replace(/[<>]/g, '')
+    .replace(/ +/g, ' ')
+    .trim()
+    .slice(0, max);
+}
+
+export function layoutId(game) {
+  const slug = plainText(game, 60).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return `game:${slug || 'unknown'}`;
+}
+
+export function sanitizeLayout(raw) {
+  const name = plainText(raw?.game ?? raw?.name, 60) || 'This game';
+  const mouseLook = Boolean(raw?.mouseLook);
+  const allowed = new Set([...BINDABLE_KEYS, ...(mouseLook ? MOUSE_KEYS : [])]);
+  const keys = {};
+  for (const [code, target] of Object.entries(raw?.keys ?? {})) {
+    if (allowed.has(code) && Object.hasOwn(TARGETS, target)) keys[code] = target;
+  }
+  const labels = {};
+  for (const [target, label] of Object.entries(raw?.labels ?? {})) {
+    const text = plainText(label, 28);
+    if (Object.hasOwn(TARGET_NAMES, target) && text) labels[target] = text;
+  }
+  const layout = { id: layoutId(name), name, about: plainText(raw?.about, 160), mouseLook, keys, labels, built: true };
+
+  // Every game must stay fully playable: give whatever was left out the key
+  // it has in the nearest built-in layout, or failing that any free key.
+  const base = LAYOUTS.find((candidate) => candidate.id === (mouseLook ? 'pc' : 'standard'));
+  const spare = BINDABLE_KEYS.filter((code) => !Object.hasOwn(keys, code)).reverse();
+  for (const target of unreachable(layout)) {
+    const usual = Object.entries(base.keys).find(([code, bound]) => bound === target && allowed.has(code) && !Object.hasOwn(keys, code));
+    const code = usual?.[0] ?? spare.find((candidate) => !Object.hasOwn(keys, candidate));
+    if (code) keys[code] = target;
+  }
+  return layout;
 }
 
 // A layout as a lookup from key to what it does, with the keys that always

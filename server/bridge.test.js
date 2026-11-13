@@ -46,6 +46,7 @@ async function watching({ consoleState = 'ready', refuseAfterFirst = false } = {
     reach: {
       locate: async () => ({ reply: { state: 'ready', address: '192.0.2.1', id: '' }, moved: false }),
       discover: async () => [{ state: consoleState, address: '192.0.2.1', id: '' }],
+      wirelessDisplay: async () => null,
       createSource: () => {
         const source = new FakeSource();
         source.connects = !(refuseAfterFirst && sources.length > 0);

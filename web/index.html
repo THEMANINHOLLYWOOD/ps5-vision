@@ -39,6 +39,7 @@
       <div id="details" class="details" hidden>
         <p id="stats"></p>
         <p id="pad-hint"></p>
+        <p id="link-hint"></p>
       </div>
       <div id="menu" class="menu" hidden>
         <button id="btn-touchpad" type="button">Touchpad press</button>
@@ -98,6 +99,12 @@
         <select id="layout"></select>
       </label>
       <p id="layout-about" class="note small"></p>
+      <!-- Shown when the Mac can ask Claude: a layout made for the game on screen. -->
+      <div id="build-row" class="build" hidden>
+        <button id="btn-build" type="button">Build for this game</button>
+        <input id="game-name" class="text" type="text" maxlength="60" autocomplete="off" placeholder="or type its name" aria-label="Game name">
+      </div>
+      <p id="build-note" class="note small" role="status" hidden></p>
       <label id="mouse-row" hidden>
         <span>Mouse speed</span>
         <input id="mouse-speed" type="range" min="20" max="300" step="5" value="100">

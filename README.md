@@ -248,6 +248,17 @@ decides how it feels.
    point; if it sent them all and fewer were shown, it is the link to your
    screen.
 
+To find out where a stutter comes from, run this on the Mac while the bridge
+is running:
+
+```bash
+npm run check
+```
+
+It watches the stream for 15 seconds, without a browser, and says whether the
+PS5 and the Mac are doing their part or which of them is the weak point. (It
+takes over the stream from whoever is playing.)
+
 ## What it does not do (yet)
 
 - **Play away from home.** The bridge only talks to devices on your own

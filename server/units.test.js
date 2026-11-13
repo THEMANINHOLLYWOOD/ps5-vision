@@ -5,7 +5,7 @@ import { FrameParser, encodeFrame } from './framing.js';
 import { AccessUnitSplitter, hasParameterSets, isKeyframe, nalTypes } from './h264.js';
 import { OggOpusReader } from './ogg.js';
 import { broadcastAddresses, findLinkedConsole, locateConsole, parseDiscoveryResponse, wakeCredential } from './discovery.js';
-import { consoleEndedIt, describeQuit, normalizeOptions } from './bridge.js';
+import { consoleEndedIt, describeQuit, normalizeOptions, shouldRejoin } from './bridge.js';
 import { txtRecord } from './bonjour.js';
 import { nextAudioSamples } from './viewer.js';
 import { BUTTON, encodeState, idleState, readGamepad, statesEqual } from '../web/controller.js';
@@ -182,8 +182,8 @@ test('face buttons, d-pad and system buttons map to the console layout', () => {
   assert.equal(readGamepad(pad({ pressed: [0] })).buttons, BUTTON.CROSS);
   assert.equal(readGamepad(pad({ pressed: [1, 3] })).buttons, BUTTON.CIRCLE | BUTTON.TRIANGLE);
   assert.equal(readGamepad(pad({ pressed: [12, 15] })).buttons, BUTTON.DPAD_UP | BUTTON.DPAD_RIGHT);
-  assert.equal(readGamepad(pad({ pressed: [8, 9, 16, 17] })).buttons,
-    BUTTON.SHARE | BUTTON.OPTIONS | BUTTON.PS | BUTTON.TOUCHPAD);
+  assert.equal(readGamepad(pad({ pressed: [8, 16, 17] })).buttons, BUTTON.SHARE | BUTTON.PS | BUTTON.TOUCHPAD);
+  assert.equal(readGamepad(pad({ pressed: [9] })).buttons, BUTTON.OPTIONS);
 });
 
 test('triggers are analog and sticks use the full signed range', () => {
@@ -431,4 +431,32 @@ test('the console ending a session is told apart from other endings', () => {
   assert.ok(!consoleEndedIt('Stopped', ''));
   assert.ok(!consoleEndedIt('Remote Play on Console is already in use', ''));
   assert.ok(!consoleEndedIt());
+});
+
+test('the bridge joins again when the console itself ends the stream', () => {
+  // Exactly what the PS5 reported when its own controller turned on. Note
+  // that it does not count as an error.
+  const kicked = {
+    reason: 'Remote has disconnected from Stream Connection the because Server shut down',
+    detail: 'Server shutting down',
+    weStopped: false,
+    watching: true,
+    rejoinsLeft: true,
+  };
+  assert.ok(shouldRejoin(kicked));
+  assert.ok(!shouldRejoin({ ...kicked, weStopped: true }), 'we ended it (End, or End and rest PS5)');
+  assert.ok(!shouldRejoin({ ...kicked, watching: false }), 'nobody is watching');
+  assert.ok(!shouldRejoin({ ...kicked, rejoinsLeft: false }), 'it keeps happening');
+  assert.ok(!shouldRejoin({ ...kicked, reason: 'Stopped', detail: '' }));
+});
+
+test('Create and Options together stand in for the PS button', () => {
+  const pressed = (...indexes) => ({
+    buttons: Array.from({ length: 18 }, (_, i) => ({ pressed: indexes.includes(i), value: indexes.includes(i) ? 1 : 0 })),
+    axes: [0, 0, 0, 0],
+  });
+  assert.equal(readGamepad(pressed(8, 9)).buttons, BUTTON.PS);
+  assert.equal(readGamepad(pressed(8, 9, 0)).buttons, BUTTON.PS | BUTTON.CROSS);
+  assert.equal(readGamepad(pressed(8)).buttons, BUTTON.SHARE);
+  assert.equal(readGamepad(pressed(9)).buttons, BUTTON.OPTIONS);
 });

@@ -67,13 +67,13 @@ const nativeBridge = () => window.webkit?.messageHandlers?.ps5;
 let autoPlayed = false;
 if (IN_APP) document.documentElement.classList.add('in-app');
 
-// Safari on a Vision Pro or iPad says it is a Mac, but has a touch screen.
-// Fullscreen there is a separate presentation that can keep a game controller
-// (and the keyboard) from reaching the page, so the page stays an ordinary
-// window unless Fullscreen is chosen from the menu.
-const TOUCH_SAFARI = navigator.maxTouchPoints > 1
-  && /Macintosh|iPad|iPhone/.test(navigator.userAgent)
-  && !/Chrome|CriOS|Firefox|FxiOS|Edg/.test(navigator.userAgent);
+// Safari, which is what a Vision Pro or iPad runs. Its fullscreen there is a
+// separate presentation that can keep a game controller (and the keyboard)
+// from reaching the page, and a Vision Pro's Safari cannot be told apart
+// from a Mac's. So in Safari the page stays an ordinary window unless
+// Fullscreen is chosen from the menu.
+const TOUCH_SAFARI = /Safari/.test(navigator.userAgent)
+  && !/Chrome|Chromium|CriOS|Firefox|FxiOS|Edg/.test(navigator.userAgent);
 
 const AUTO_REFRESH_AFTER_S = 4;          // seconds without a new frame
 const AUTO_REFRESH_MIN_GAP_MS = 15_000;  // don't loop if the network is down
@@ -605,7 +605,7 @@ function padProblem() {
     // A controller only shows up for the window that was touched last, and
     // only once one of its buttons is pressed.
     const leave = document.fullscreenElement || document.webkitFullscreenElement ? 'Leave fullscreen, tap' : 'Tap';
-    return `No controller seen yet. ${leave} the picture once, then press any button on the controller. (One connected to your PS5 itself works as it is.)`;
+    return `No controller seen yet. ${leave} the picture once, then press ✕ on the controller. Not the PS button: this device keeps that one for itself. (A controller connected to the PS5 itself works as it is.)`;
   }
   return 'No controller on this device. The one connected to your PS5 works as it is; for one paired here, press a button on it. Or press ? for keyboard controls.';
 }
@@ -665,6 +665,8 @@ function sendDiag() {
     pads,
     pressed: pad ? pad.buttons.filter((button) => button.pressed).length : 0,
     touch: TOUCH_SAFARI,
+    touchPoints: navigator.maxTouchPoints,
+    ua: navigator.userAgent.replace(/^Mozilla\/5\.0 /, ''),
     fullscreen: Boolean(document.fullscreenElement || document.webkitFullscreenElement),
     focused: document.hasFocus(),
     app: IN_APP,
@@ -1039,7 +1041,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) relea
 window.addEventListener('gamepadconnected', (event) => {
   loadStatus();
   // Say so: until now the only sign was a word changing in the bar.
-  if (streaming) showToast(`Controller connected: ${String(event.gamepad?.id ?? '').split('(')[0].trim().slice(0, 40) || 'ready'}`);
+  if (streaming) showToast('Controller connected. For the PS button, hold Create and Options together.', 6000);
 });
 
 // Remember the start-screen choices between visits.

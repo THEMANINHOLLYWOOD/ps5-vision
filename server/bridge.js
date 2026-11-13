@@ -36,6 +36,17 @@ export function consoleEndedIt(reason = '', detail = '') {
   return /server shut(ting)? down/i.test(`${reason} ${detail}`);
 }
 
+// Whether to join the console again after a session ended. The console says
+// this goodbye politely (it is not reported as an error), so whether it was
+// an error must not come into it: only that the console ended it, that we
+// did not ask it to, and that someone is still watching.
+export function shouldRejoin({ reason, detail, weStopped, watching, rejoinsLeft }) {
+  return consoleEndedIt(reason, detail) && !weStopped && watching && rejoinsLeft;
+}
+// After joining again, how long and how often to retry if that fails.
+const REJOIN_RETRY_MS = 45_000;
+const REJOIN_TRIES = 4;
+
 // Plain-language versions of the reasons chiaki reports for a session ending.
 const QUIT_HINTS = [
   [/already in use/i, 'Another device is already using Remote Play on this PS5. Close it there and try again.'],
@@ -62,7 +73,10 @@ export function normalizeOptions(raw = {}) {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class Bridge {
-  constructor({ demo = false, console: target = null, helperPath, verbose = false, log = () => {}, onConsoleMoved = () => {} }) {
+  // `reach` replaces how the console is found and connected to; tests use it.
+  constructor({ demo = false, console: target = null, helperPath, verbose = false, log = () => {}, onConsoleMoved = () => {}, reach = {} }) {
+    this.reach = { locate: locateConsole, discover, createSource: null, ...reach };
+    this.rejoinTries = 0;
     this.demo = demo;
     this.console = target;
     this.onConsoleMoved = onConsoleMoved;
@@ -217,7 +231,7 @@ export class Bridge {
         // The text comes from the browser: keep it short and printable.
         const line = (`browser: secure=${Boolean(message.secure)} gamepadApi=${Boolean(message.api)} `
           + `touch=${Boolean(message.touch)} fullscreen=${Boolean(message.fullscreen)} focused=${Boolean(message.focused)} `
-          + `app=${Boolean(message.app)} pads=${JSON.stringify(message.pads ?? []).slice(0, 300)} pressed=${Number(message.pressed) || 0}`)
+          + `app=${Boolean(message.app)} touchPoints=${Number(message.touchPoints) || 0} ua="${String(message.ua ?? '').slice(0, 140)}" pads=${JSON.stringify(message.pads ?? []).slice(0, 300)} pressed=${Number(message.pressed) || 0}`)
           .replace(/[^\x20-\x7e]/g, '?');
         if (line !== this.lastDiag) {
           this.lastDiag = line;
@@ -287,9 +301,9 @@ export class Bridge {
     }
 
     viewer.sendControl({ type: 'state', state: 'connecting' });
-    const source = this.demo
+    const source = this.reach.createSource?.(options) ?? (this.demo
       ? new DemoSource(options)
-      : new ConsoleSource({ helperPath: this.helperPath, console: this.console, verbose: this.verbose, ...options });
+      : new ConsoleSource({ helperPath: this.helperPath, console: this.console, verbose: this.verbose, ...options }));
     this.source = source;
     this.sourceOptions = options;
     this.sourceConnected = false;
@@ -344,6 +358,7 @@ export class Bridge {
       case 'connected':
         this.sourceConnected = true;
         this.busyTries = 0;
+        this.rejoinUntil = 0;
         this.lastMediaAt = Date.now();
         this.log('stream connected');
         this.viewer?.sendControl({ type: 'state', state: 'streaming' });
@@ -382,8 +397,21 @@ export class Bridge {
           this.#retrySoon(source);
           break;
         }
-        if (event.error && consoleEndedIt(event.reason, event.detail) && this.viewer && this.#mayRejoin()) {
+        if (shouldRejoin({
+          reason: event.reason,
+          detail: event.detail,
+          weStopped: source.stopping,
+          watching: Boolean(this.viewer),
+          rejoinsLeft: this.#mayRejoin(),
+        })) {
           this.#rejoin(source, describeQuit(event.reason, event.detail));
+          break;
+        }
+        // The first try at joining again can come too soon for the console.
+        if (event.error && this.viewer && !source.stopping && Date.now() < (this.rejoinUntil ?? 0)
+          && this.rejoinTries < REJOIN_TRIES) {
+          this.rejoinTries++;
+          this.#retrySoon(source);
           break;
         }
         this.viewer?.sendControl({
@@ -411,7 +439,7 @@ export class Bridge {
   #retrySoon(source) {
     const viewer = this.viewer;
     const options = this.sourceOptions;
-    this.log('the console is still holding the old session; trying again shortly');
+    this.log('the console is not taking the session yet; trying again shortly');
     source.once('exit', () => {
       setTimeout(() => {
         if (!viewer || this.viewer !== viewer || this.source) return;
@@ -439,14 +467,17 @@ export class Bridge {
       setTimeout(async () => {
         try {
           if (this.viewer !== viewer || this.source) return;
-          const found = (await discover({ host: this.console.host, timeoutMs: 1500 }))[0];
+          const found = (await this.reach.discover({ host: this.console.host, timeoutMs: 1500 }))[0];
           if (this.viewer !== viewer || this.source) return;
           if (found?.state !== 'ready') {
-            viewer.sendControl({ type: 'ended', error: true, message: goodbye });
+            this.log('the console has gone to sleep or is off');
+            viewer.sendControl({ type: 'ended', error: false, message: goodbye });
             return;
           }
           this.log('the console is still on (its own controller probably turned on); joining it again');
           this.retryBusyUntil = Date.now() + RETRY_BUSY_MS;
+          this.rejoinUntil = Date.now() + REJOIN_RETRY_MS;
+          this.rejoinTries = 0;
           await this.#startSource(viewer, options);
         } catch (err) {
           this.log(`could not rejoin the console: ${err.stack ?? err.message}`);
@@ -491,7 +522,7 @@ export class Bridge {
   // Finds the console and, if it is in rest mode, wakes it and waits.
   // Returns true once it should accept a connection.
   async #ensureAwake(viewer, current) {
-    const located = await locateConsole(this.console);
+    const located = await this.reach.locate(this.console);
     if (!current()) return false;
     if (located.moved) this.#consoleMoved(located.reply);
     if (located.otherDevice) this.log(`the device at ${this.console.host} is not ${this.console.name}`);
@@ -512,7 +543,7 @@ export class Bridge {
       await wakeup(host, this.console.registKey, { ps5: this.console.ps5 }).catch((err) => this.log(`wake-up failed: ${err.message}`));
       await sleep(2000);
       if (!current()) return false;
-      found = (await discover({ host, timeoutMs: 1000 }))[0];
+      found = (await this.reach.discover({ host, timeoutMs: 1000 }))[0];
       if (!current()) return false;
       if (found?.state === 'ready') {
         // The console answers discovery a little before Remote Play is up.

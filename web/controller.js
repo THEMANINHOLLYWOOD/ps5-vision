@@ -71,6 +71,11 @@ export function readGamepad(gamepad, extraButtons = 0) {
   for (const [index, bit] of STANDARD_LAYOUT) {
     if (gamepad.buttons[index]?.pressed) state.buttons |= bit;
   }
+  // Headsets, tablets and some browsers keep the PS button for themselves
+  // (on a Vision Pro it opens the Home View), and a page cannot change that.
+  // Create and Options held together stand in for it.
+  const combo = BUTTON.SHARE | BUTTON.OPTIONS;
+  if ((state.buttons & combo) === combo) state.buttons = (state.buttons & ~combo) | BUTTON.PS;
   state.l2 = triggerToByte(gamepad.buttons[6]);
   state.r2 = triggerToByte(gamepad.buttons[7]);
   state.lx = axisToInt16(gamepad.axes[0]);

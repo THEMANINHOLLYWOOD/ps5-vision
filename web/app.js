@@ -14,6 +14,7 @@ const PROGRESS_TEXT = {
   searching: 'Looking for your PS5…',
   waking: 'Waking your PS5… this can take up to a minute.',
   connecting: 'Connecting…',
+  rejoining: 'Your PS5 paused the stream, usually because its own controller turned on. Joining again…',
 };
 const POLL_INTERVAL_MS = 8;      // how often the controller is read
 const RESEND_INTERVAL_MS = 33;   // unchanged state is repeated, since input packets may be dropped
@@ -72,6 +73,7 @@ const RECONNECT_TRIES = 5;               // before a reconnect gives up
 const RECONNECT_GAP_MS = 2000;
 const STRUGGLING_AFTER_S = 10;           // of a poor picture, before suggesting a lighter one
 let starvedSamples = 0;
+let macBusy = false; // the Mac said it is (re)connecting to the PS5
 let poorSamples = 0;
 let strugglingHinted = false;
 let recentFps = [];
@@ -223,7 +225,7 @@ function updatePadNote() {
   const status = statusCache ?? {};
   const padNote = $('pad-note');
   if (gamepadsAvailable()) {
-    padNote.textContent = 'Controller: pair it with this device over Bluetooth, not with the PS5 (the PS5 ends Remote Play when its own controller turns on). No controller? The keyboard works too (press ? while playing), and More > On-screen buttons shows one you can click.';
+    padNote.textContent = 'Controller: the one connected to your PS5 works as it is. Turn it on and play; the picture pauses for a few seconds when it turns on, then comes back by itself. A controller paired with this device over Bluetooth works too. No controller? Use the keyboard (press ? while playing) or More > On-screen buttons.';
   } else if (status.secureUrl) {
     padNote.innerHTML = '';
     padNote.append('This browser only allows controllers on a secure page. Open ');
@@ -490,12 +492,16 @@ function onControl(connection, raw) {
     case 'state':
       if (message.state === 'streaming') {
         streaming = true;
+        macBusy = false;
         $('stage').classList.add('playing');
         showPanel($('panel-tap').hidden ? null : 'panel-tap');
         updatePad();
         showHud();
         hintAboutInput();
       } else if (PROGRESS_TEXT[message.state]) {
+        // The Mac is busy getting the picture back; nothing this page could
+        // reconnect would speed that up.
+        macBusy = true;
         showProgress(PROGRESS_TEXT[message.state]);
       }
       break;
@@ -544,6 +550,7 @@ function teardown() {
   stalledSamples = 0;
   frozenSamples = 0;
   starvedSamples = 0;
+  macBusy = false;
   poorSamples = 0;
   recentFps = [];
   $('signal').dataset.level = '0';
@@ -584,7 +591,7 @@ function activeGamepad() {
 function padProblem() {
   if (!window.isSecureContext) return 'Keyboard only: open the https:// address to use a controller.';
   if (!gamepadsAvailable()) return 'Keyboard only: this browser does not share controllers with pages.';
-  return 'No controller seen yet: press a button on it, or press ? for keyboard controls.';
+  return 'No controller on this device. The one connected to your PS5 works as it is; for one paired here, press a button on it. Or press ? for keyboard controls.';
 }
 
 function nativeInput(now) {
@@ -610,7 +617,7 @@ function pollController() {
   const now = performance.now();
   const native = nativeInput(now);
   const indicator = $('pad-indicator');
-  const label = gamepad || native ? 'Controller' : keyboardUsed ? 'Keyboard' : 'No controller';
+  const label = gamepad || native ? 'Controller' : keyboardUsed ? 'Keyboard' : 'No controller here';
   if (indicator.textContent !== label) {
     indicator.dataset.on = String(Boolean(gamepad || native || keyboardUsed));
     indicator.textContent = label;
@@ -849,9 +856,9 @@ async function sampleStats(connection) {
   }
   // The Mac itself is getting no picture from the PS5. Reconnecting this page
   // to the Mac would not help; say what is happening and wait for it.
-  const macStarved = streaming && serverStats?.fps === 0;
+  const macStarved = streaming && (macBusy || serverStats?.fps === 0);
   starvedSamples = macStarved ? starvedSamples + 1 : 0;
-  if (starvedSamples === 3) showToast('Waiting for the PS5: its connection to the Mac dropped out…', 5000);
+  if (starvedSamples === 3 && !macBusy) showToast('Waiting for the PS5: its connection to the Mac dropped out…', 5000);
   // No new picture for several seconds even after asking for a keyframe:
   // reconnect, at most once every 15 seconds.
   frozenSamples = streaming && decoded === 0 && !macStarved ? frozenSamples + 1 : 0;

@@ -5,7 +5,7 @@ import { FrameParser, encodeFrame } from './framing.js';
 import { AccessUnitSplitter, hasParameterSets, isKeyframe, nalTypes } from './h264.js';
 import { OggOpusReader } from './ogg.js';
 import { broadcastAddresses, findLinkedConsole, locateConsole, parseDiscoveryResponse, wakeCredential } from './discovery.js';
-import { describeQuit, normalizeOptions } from './bridge.js';
+import { consoleEndedIt, describeQuit, normalizeOptions } from './bridge.js';
 import { txtRecord } from './bonjour.js';
 import { nextAudioSamples } from './viewer.js';
 import { BUTTON, encodeState, idleState, readGamepad, statesEqual } from '../web/controller.js';
@@ -423,4 +423,12 @@ test('sound stays gapless through uneven arrival, and skips what never came', ()
   assert.equal(push(2_110_000), after + 480);
   // No time given (the test pattern): plain counting.
   assert.equal(nextAudioSamples({ audioSamples: 7, audioFrameSize: 480, audioBase: null }, undefined), 7);
+});
+
+test('the console ending a session is told apart from other endings', () => {
+  // What chiaki reports when the PS5's own controller turns on (or it goes to rest).
+  assert.ok(consoleEndedIt('Remote has disconnected from Stream Connection the because Server shut down', 'Server shutting down'));
+  assert.ok(!consoleEndedIt('Stopped', ''));
+  assert.ok(!consoleEndedIt('Remote Play on Console is already in use', ''));
+  assert.ok(!consoleEndedIt());
 });

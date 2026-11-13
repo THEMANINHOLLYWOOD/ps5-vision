@@ -19,6 +19,21 @@ const STALLED_SOURCE_MS = 8000;
 // still busy with the old session, and how often.
 const RETRY_BUSY_MS = 60_000;
 const RETRY_BUSY_GAP_MS = 4000;
+// The console ends Remote Play when its own controller turns on: whoever is
+// at the console comes first. It stays on, though, and takes Remote Play
+// straight back with that controller still working. So join again, and the
+// PS5's own controller plays the game being watched. Not more than a few
+// times in a row, in case the console really does not want us.
+const REJOIN_GAP_MS = 2500;
+const REJOIN_LIMIT = 3;
+const REJOIN_WINDOW_MS = 120_000;
+
+// True when the console itself ended the session (as opposed to the network
+// failing, or us stopping). It says the same when it goes into rest mode;
+// whether it is still on afterwards tells the two apart.
+export function consoleEndedIt(reason = '', detail = '') {
+  return /server shut(ting)? down/i.test(`${reason} ${detail}`);
+}
 
 // Plain-language versions of the reasons chiaki reports for a session ending.
 const QUIT_HINTS = [
@@ -358,6 +373,10 @@ export class Bridge {
           this.#retrySoon(source);
           break;
         }
+        if (event.error && consoleEndedIt(event.reason, event.detail) && this.viewer && this.#mayRejoin()) {
+          this.#rejoin(source, describeQuit(event.reason, event.detail));
+          break;
+        }
         this.viewer?.sendControl({
           type: 'ended',
           error: Boolean(event.error),
@@ -390,6 +409,41 @@ export class Bridge {
         this.#startSource(viewer, options)
           .catch((err) => this.log(`could not reconnect to the console: ${err.stack ?? err.message}`));
       }, RETRY_BUSY_GAP_MS);
+    });
+  }
+
+  #mayRejoin() {
+    const now = Date.now();
+    this.rejoins = (this.rejoins ?? []).filter((at) => now - at < REJOIN_WINDOW_MS);
+    return this.rejoins.length < REJOIN_LIMIT;
+  }
+
+  // The console ended the session but may still be on (see REJOIN_GAP_MS).
+  // If it is, start a new session for whoever is watching; if it has gone to
+  // sleep, pass on `goodbye` after all.
+  #rejoin(source, goodbye) {
+    const viewer = this.viewer;
+    const options = this.sourceOptions;
+    this.rejoins.push(Date.now());
+    viewer.sendControl({ type: 'state', state: 'rejoining' });
+    source.once('exit', () => {
+      setTimeout(async () => {
+        try {
+          if (this.viewer !== viewer || this.source) return;
+          const found = (await discover({ host: this.console.host, timeoutMs: 1500 }))[0];
+          if (this.viewer !== viewer || this.source) return;
+          if (found?.state !== 'ready') {
+            viewer.sendControl({ type: 'ended', error: true, message: goodbye });
+            return;
+          }
+          this.log('the console is still on (its own controller probably turned on); joining it again');
+          this.retryBusyUntil = Date.now() + RETRY_BUSY_MS;
+          await this.#startSource(viewer, options);
+        } catch (err) {
+          this.log(`could not rejoin the console: ${err.stack ?? err.message}`);
+          viewer.sendControl({ type: 'ended', error: true, message: goodbye });
+        }
+      }, REJOIN_GAP_MS);
     });
   }
 

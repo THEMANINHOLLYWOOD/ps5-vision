@@ -25,10 +25,14 @@ Not affiliated with or endorsed by Sony Interactive Entertainment.
   [Node.js](https://nodejs.org) 20 or newer.
 - **Something to play on**: Safari on Vision Pro, or a current Safari, Chrome,
   Edge or Firefox on anything else on the same network.
-- **A controller paired to the device you play on**, not to the PS5. For a
-  DualSense: hold **Create + PS** until the light bar flashes, then pick it in
-  that device's Bluetooth settings. On a laptop you can also play with the
-  keyboard, or click an on-screen controller.
+- **A controller.** The one connected to your PS5 works as it is: turn it on
+  and play. (The PS5 pauses the stream for a few seconds when its own
+  controller turns on; the bridge joins again by itself.) You can also pair
+  one with the device you play on instead. For a DualSense: hold
+  **Create + PS** until the light bar flashes, then pick it in that device's
+  Bluetooth settings; it then no longer talks to the PS5 until you pair it
+  back with a USB cable. On a laptop you can also play with the keyboard, or
+  click an on-screen controller.
 
 > The PS5 ends a Remote Play session as soon as a controller connected to the
 > console itself is switched on. That is the console's rule, so the controller
@@ -217,7 +221,8 @@ can make the scan), and add the resulting `.referenceobject` file to the app.
 
 | What you see | What to do |
 | --- | --- |
-| The session ends when you pick up the controller | The controller is still paired to the PS5 and woke it. Pair it to the device you play on instead (see "What you need"). |
+| The picture pauses when you pick up the controller | The controller is connected to the PS5, which ends Remote Play when its own controller turns on. The bridge joins again by itself within a few seconds, and that controller keeps working. |
+| A controller paired with the headset or laptop isn't seen | Just pressing PS reconnects a DualSense to the PS5, not to your device. Put it in pairing mode (hold **Create + PS** until the light flashes fast), pick it in the device's Bluetooth settings, then press a button with the page in front. |
 | The page says the access code is not right | Use the code from the bridge's window on the Mac (the line starting "Access code"). After many wrong tries, wait a minute. |
 | "No controller" stays grey | Use the `https://` address; browsers hide controllers from plain `http://` pages. Press any button once the stream is up. |
 | `npm run link` finds no console | The PS5 must be fully on, not in rest mode. If macOS asks whether Terminal may find devices on your local network, allow it (System Settings > Privacy & Security > Local Network). Or pass the address: `npm run link -- --host 192.168.x.x`. |

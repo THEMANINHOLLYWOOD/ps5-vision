@@ -216,7 +216,8 @@ export class Bridge {
         // so input problems can be diagnosed from the Mac.
         // The text comes from the browser: keep it short and printable.
         const line = (`browser: secure=${Boolean(message.secure)} gamepadApi=${Boolean(message.api)} `
-          + `pads=${JSON.stringify(message.pads ?? []).slice(0, 300)} pressed=${Number(message.pressed) || 0}`)
+          + `touch=${Boolean(message.touch)} fullscreen=${Boolean(message.fullscreen)} focused=${Boolean(message.focused)} `
+          + `app=${Boolean(message.app)} pads=${JSON.stringify(message.pads ?? []).slice(0, 300)} pressed=${Number(message.pressed) || 0}`)
           .replace(/[^\x20-\x7e]/g, '?');
         if (line !== this.lastDiag) {
           this.lastDiag = line;

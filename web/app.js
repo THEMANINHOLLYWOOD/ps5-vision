@@ -67,6 +67,14 @@ const nativeBridge = () => window.webkit?.messageHandlers?.ps5;
 let autoPlayed = false;
 if (IN_APP) document.documentElement.classList.add('in-app');
 
+// Safari on a Vision Pro or iPad says it is a Mac, but has a touch screen.
+// Fullscreen there is a separate presentation that can keep a game controller
+// (and the keyboard) from reaching the page, so the page stays an ordinary
+// window unless Fullscreen is chosen from the menu.
+const TOUCH_SAFARI = navigator.maxTouchPoints > 1
+  && /Macintosh|iPad|iPhone/.test(navigator.userAgent)
+  && !/Chrome|CriOS|Firefox|FxiOS|Edg/.test(navigator.userAgent);
+
 const AUTO_REFRESH_AFTER_S = 4;          // seconds without a new frame
 const AUTO_REFRESH_MIN_GAP_MS = 15_000;  // don't loop if the network is down
 const RECONNECT_TRIES = 5;               // before a reconnect gives up
@@ -374,7 +382,7 @@ async function play({ quiet = false, attempt = 1 } = {}) {
   const current = () => generation === playGeneration;
   ensureAudio();
   if (!quiet) {
-    enterFullscreen();
+    if (!TOUCH_SAFARI) enterFullscreen();
     showProgress(PROGRESS_TEXT.connecting);
   } else {
     // A refresh normally shows the picture again within a second or two. If
@@ -551,6 +559,8 @@ function teardown() {
   frozenSamples = 0;
   starvedSamples = 0;
   macBusy = false;
+  lostPerSecond = [];
+  lastFramesLost = null;
   poorSamples = 0;
   recentFps = [];
   $('signal').dataset.level = '0';
@@ -591,6 +601,12 @@ function activeGamepad() {
 function padProblem() {
   if (!window.isSecureContext) return 'Keyboard only: open the https:// address to use a controller.';
   if (!gamepadsAvailable()) return 'Keyboard only: this browser does not share controllers with pages.';
+  if (TOUCH_SAFARI) {
+    // A controller only shows up for the window that was touched last, and
+    // only once one of its buttons is pressed.
+    const leave = document.fullscreenElement || document.webkitFullscreenElement ? 'Leave fullscreen, tap' : 'Tap';
+    return `No controller seen yet. ${leave} the picture once, then press any button on the controller. (One connected to your PS5 itself works as it is.)`;
+  }
   return 'No controller on this device. The one connected to your PS5 works as it is; for one paired here, press a button on it. Or press ? for keyboard controls.';
 }
 
@@ -648,6 +664,10 @@ function sendDiag() {
     api: gamepadsAvailable(),
     pads,
     pressed: pad ? pad.buttons.filter((button) => button.pressed).length : 0,
+    touch: TOUCH_SAFARI,
+    fullscreen: Boolean(document.fullscreenElement || document.webkitFullscreenElement),
+    focused: document.hasFocus(),
+    app: IN_APP,
   });
 }
 
@@ -805,6 +825,50 @@ function rumble(left, right) {
 
 // ------------------------------------------------------------------- stats
 
+// When the PS5's own link to the Mac keeps losing pictures, each loss is a
+// short freeze, and no amount of reconnecting helps: there is simply more
+// picture than the Wi-Fi carries. A lighter picture gets through, so step
+// down by itself (lighter stream first, then lower resolution), say so, and
+// remember it; "Picture" on the start screen changes it back.
+const LINK_WINDOW_S = 30;
+const LINK_BAD_SECONDS = 3;    // seconds with pictures lost, out of the last 30
+const LINK_BAD_FRAMES = 12;
+const STEP_DOWN_GAP_MS = 60_000;
+const LOWER_RESOLUTION = { 1080: '720', 720: '540' };
+let lostPerSecond = [];
+let lastFramesLost = null;
+let steppedDownAt = 0;
+
+function watchConsoleLink() {
+  if (!streaming || macBusy || !serverStats) return;
+  const total = Number(serverStats.framesLost) || 0;
+  if (lastFramesLost !== null && total >= lastFramesLost) lostPerSecond.push(total - lastFramesLost);
+  lastFramesLost = total;
+  if (lostPerSecond.length > LINK_WINDOW_S) lostPerSecond.shift();
+  const badSeconds = lostPerSecond.filter((count) => count > 0).length;
+  const frames = lostPerSecond.reduce((sum, count) => sum + count, 0);
+  if (badSeconds < LINK_BAD_SECONDS || frames < LINK_BAD_FRAMES) return;
+  if (Date.now() - steppedDownAt < STEP_DOWN_GAP_MS) return;
+
+  let change = null;
+  if ($('opt-net').value === 'strong') {
+    $('opt-net').value = 'weak';
+    change = 'a lighter stream';
+  } else if (LOWER_RESOLUTION[$('opt-res').value]) {
+    $('opt-res').value = LOWER_RESOLUTION[$('opt-res').value];
+    change = `${$('opt-res').value}p`;
+  }
+  if (!change) return; // already as light as it goes
+  steppedDownAt = Date.now();
+  lostPerSecond = [];
+  for (const id of ['opt-res', 'opt-net']) {
+    try { localStorage.setItem(id, $(id).value); } catch { /* not remembered */ }
+  }
+  summarizeOptions();
+  showToast(`The picture kept breaking up on the way from the PS5, so it is now ${change}: smoother on this Wi-Fi.`, 8000);
+  play({ quiet: true });
+}
+
 // The three bars in the corner of the bar: how much of the picture the PS5
 // sends is actually reaching the screen, averaged over a few seconds so a
 // single hiccup doesn't make them flicker.
@@ -868,6 +932,7 @@ async function sampleStats(connection) {
     return;
   }
   updateSignal(decoded, (inbound.packetsLost ?? 0) - (previous.packetsLost ?? 0));
+  watchConsoleLink();
 
   const parts = [];
   if (inbound.frameWidth) parts.push(`${inbound.frameHeight}p`);
@@ -971,7 +1036,11 @@ window.addEventListener('keyup', onKeyUp);
 // A key let go while another window had focus never reports its release.
 window.addEventListener('blur', releaseAllInput);
 document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAllInput(); });
-window.addEventListener('gamepadconnected', loadStatus);
+window.addEventListener('gamepadconnected', (event) => {
+  loadStatus();
+  // Say so: until now the only sign was a word changing in the bar.
+  if (streaming) showToast(`Controller connected: ${String(event.gamepad?.id ?? '').split('(')[0].trim().slice(0, 40) || 'ready'}`);
+});
 
 // Remember the start-screen choices between visits.
 for (const id of ['opt-res', 'opt-fps', 'opt-net']) {

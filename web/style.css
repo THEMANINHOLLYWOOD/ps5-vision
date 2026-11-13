@@ -233,7 +233,7 @@ summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
   border-radius: 999px;
 }
 .bar button {
-  min-height: 52px;
+  min-height: 56px;
   padding: 0 18px;
   background: none;
   white-space: nowrap;
@@ -241,7 +241,7 @@ summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .bar button:hover:not(:disabled),
 .bar button[aria-expanded="true"] { background: var(--control); }
 .bar button.icon {
-  width: 52px;
+  width: 56px;
   padding: 0;
   display: grid;
   place-items: center;
@@ -324,7 +324,7 @@ summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
   flex-direction: column;
 }
 .menu button {
-  min-height: 52px;
+  min-height: 56px;
   padding: 0 18px;
   border-radius: 16px;
   background: none;
@@ -435,3 +435,6 @@ summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
    controller, so browser-only controls are left out. */
 .in-app #btn-fullscreen,
 .in-app #capture-note { display: none; }
+/* The app's window is far larger than a browser's, and is aimed at with the
+   eyes: the bar grows to match. */
+.in-app #hud { zoom: 1.3; }

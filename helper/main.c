@@ -91,6 +91,8 @@ static size_t g_log_kind_count = 0;
 static unsigned g_log_other = 0; // messages beyond LOG_KINDS different kinds
 static uint64_t g_log_window_start = 0;
 static bool g_log_everything = false; // --verbose
+static unsigned g_log_resent = 0;
+#define LOG_RESENT_WORTH_SAYING 100
 
 // Call with g_log_mutex held.
 static void log_summarize(void)
@@ -123,12 +125,25 @@ static void log_cb(ChiakiLogLevel level, const char *msg, void *user)
 		text++;
 	if(strncmp(msg, "offset ", 7) == 0 || (text != msg && strspn(text, "0123456789abcdef") > 0 && text[strspn(text, "0123456789abcdef")] == ' '))
 		return;
+	// The console sends some messages twice when an acknowledgement is slow;
+	// chiaki reports each copy as an error. A few a second is normal and not
+	// worth a line; a flood means the link is struggling, and is summed up.
+	bool resent = strncmp(msg, "Takion dropping data", 20) == 0;
 	pthread_mutex_lock(&g_log_mutex);
 	uint64_t now = now_us();
 	if(now - g_log_window_start >= LOG_WINDOW_US)
 	{
+		if(g_log_resent >= LOG_RESENT_WORTH_SAYING)
+			fprintf(stderr, "[W] the console repeated itself %u times in a second: its link to this Mac is struggling\n", g_log_resent);
+		g_log_resent = 0;
 		log_summarize();
 		g_log_window_start = now;
+	}
+	if(resent)
+	{
+		g_log_resent++;
+		pthread_mutex_unlock(&g_log_mutex);
+		return;
 	}
 	LogKind *kind = NULL;
 	for(size_t i = 0; i < g_log_kind_count && !kind; i++)

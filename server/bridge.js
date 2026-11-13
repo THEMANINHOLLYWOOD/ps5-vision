@@ -19,6 +19,7 @@ const STALLED_SOURCE_MS = 8000;
 // still busy with the old session, and how often.
 const RETRY_BUSY_MS = 60_000;
 const RETRY_BUSY_GAP_MS = 4000;
+const BUSY_TRIES = 3; // retries when nothing says a session of ours just died
 // The console ends Remote Play when its own controller turns on: whoever is
 // at the console comes first. It stays on, though, and takes Remote Play
 // straight back with that controller still working. So join again, and the
@@ -81,6 +82,7 @@ export class Bridge {
     this.startToken = 0;
     this.idleTimer = null;
     this.lastKeyframeRequest = 0;
+    this.busyTries = 0;
 
     // A slip in the once-a-second housekeeping must never end the game.
     this.statsTimer = setInterval(() => {
@@ -340,6 +342,7 @@ export class Bridge {
     switch (event.type) {
       case 'connected':
         this.sourceConnected = true;
+        this.busyTries = 0;
         this.lastMediaAt = Date.now();
         this.log('stream connected');
         this.viewer?.sendControl({ type: 'state', state: 'streaming' });
@@ -369,7 +372,12 @@ export class Bridge {
         this.log(`session ended: ${event.reason}${event.detail ? ` (${event.detail})` : ''}`);
         // After a session died without a goodbye, the console goes on
         // holding it for a little while and turns the new one away.
-        if (event.error && /already in use/i.test(event.reason) && Date.now() < (this.retryBusyUntil ?? 0)) {
+        // The same happens after the bridge itself was closed mid-game and
+        // started again, so a few tries are always worth it before saying
+        // that someone else is playing.
+        if (event.error && /already in use/i.test(event.reason) && this.viewer
+          && (Date.now() < (this.retryBusyUntil ?? 0) || this.busyTries < BUSY_TRIES)) {
+          this.busyTries++;
           this.#retrySoon(source);
           break;
         }

@@ -710,6 +710,9 @@ static int cmd_stream(int argc, char **argv)
 	// the session properly instead of dying mid-stream, so the console is told.
 	signal(SIGINT, on_stop_signal);
 	signal(SIGTERM, on_stop_signal);
+	// Closing the Terminal window hangs up on this process too. Without a
+	// goodbye the console keeps the session and turns the next one away.
+	signal(SIGHUP, on_stop_signal);
 
 	pthread_t writer;
 	bool have_writer = pthread_create(&writer, NULL, writer_thread, NULL) == 0;

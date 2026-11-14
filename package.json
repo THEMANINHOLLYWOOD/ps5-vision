@@ -35,6 +35,7 @@
     "vision": "open visionos/PS5Vision.xcodeproj",
     "vision:pair": "bash scripts/pair-vision.sh",
     "vision:install": "bash scripts/install-vision.sh",
+    "vision:release": "bash scripts/release-vision.sh",
     "check": "node scripts/check.mjs",
     "test": "node --test server/*.test.js"
   },

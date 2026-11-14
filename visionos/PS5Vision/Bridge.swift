@@ -1,7 +1,7 @@
 import Foundation
 import Network
 
-/// A PS5 Vision bridge (the Node server on a Mac), as announced over Bonjour
+/// A bridge (the Node server on a Mac), as announced over Bonjour
 /// or typed in by hand.
 struct Bridge: Identifiable, Hashable, Codable {
     var name: String
@@ -15,6 +15,11 @@ struct Bridge: Identifiable, Hashable, Codable {
     var fingerprint: String?
 
     var id: String { "\(host.lowercased()):\(port)" }
+
+    /// Not a bridge at all: the demo built into the app, for trying the
+    /// screen and a controller with no console and no Mac.
+    static let demo = Bridge(name: "Demo", scheme: "demo", host: "demo", port: 0)
+    var isDemo: Bool { scheme == "demo" }
 
     /// The page, with `app=1` so it knows a native app is hosting it.
     var pageURL: URL? {
@@ -63,7 +68,7 @@ final class BridgeBrowser {
         browser.stateUpdateHandler = { [weak self] state in
             let message: String? = switch state {
             case .failed(let error), .waiting(let error):
-                "Can't look for the bridge: \(error.localizedDescription). Allow Local Network access for PS5 Vision in Settings."
+                "Can't look for the bridge: \(error.localizedDescription). Allow Local Network access for this app in Settings."
             default:
                 nil
             }

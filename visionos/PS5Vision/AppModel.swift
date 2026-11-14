@@ -1,6 +1,11 @@
 import Foundation
 import UIKit
 
+/// The app's name as people see it (set once, as APP_NAME in project.yml).
+let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Lookplay"
+/// Where setting up the Mac side is explained.
+let setupGuide = URL(string: "https://github.com/THEMANINHOLLYWOOD/ps5-vision#readme")!
+
 /// What the app's windows and the room share.
 @Observable
 final class AppModel {

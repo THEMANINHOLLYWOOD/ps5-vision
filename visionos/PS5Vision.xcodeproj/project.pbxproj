@@ -11,20 +11,26 @@
 		2FD4294A846CB8257E0DAA57 /* Bridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10C6B7B6F58406F4C3DBA25 /* Bridge.swift */; };
 		4FCB08B7537C90CE5FECB3EF /* PS5VisionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF96C03F0472B11FBD6619CD /* PS5VisionApp.swift */; };
 		522D7B30FD45F559C7B3AAC9 /* ConsoleSpot.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF87BE522F0FD7BBB06615B1 /* ConsoleSpot.swift */; };
+		55D6094C0CBFC770A4FBBB14 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 07A153AA5203886523905E9F /* PrivacyInfo.xcprivacy */; };
 		7D5E99612F6A9BA16179DCAB /* ScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1913727A8BFA8B20BBFA50C5 /* ScreenView.swift */; };
 		BFB2E85E6DCBB053012BAB5F /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E194D8320ACDB6BF794C59A /* AppModel.swift */; };
 		C2487602DB706DF06E55E649 /* NativeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 671B3DAB99D062349AF14089 /* NativeController.swift */; };
 		C8EA8955818205136D198E10 /* RoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7235B6AF8B261A5E0843216E /* RoomView.swift */; };
+		E2FED3D465B869DD4DB8A5ED /* Demo.html in Resources */ = {isa = PBXBuildFile; fileRef = 55F42268EF2F00F4C953C0B2 /* Demo.html */; };
+		F67161FB544DB8F6B62E9B2D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B812C021F2281FD5E49EDF25 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		07A153AA5203886523905E9F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		1913727A8BFA8B20BBFA50C5 /* ScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenView.swift; sourceTree = "<group>"; };
 		4A57165E841B18B7471E1536 /* LauncherView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherView.swift; sourceTree = "<group>"; };
+		55F42268EF2F00F4C953C0B2 /* Demo.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = Demo.html; sourceTree = "<group>"; };
 		671B3DAB99D062349AF14089 /* NativeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeController.swift; sourceTree = "<group>"; };
 		7235B6AF8B261A5E0843216E /* RoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomView.swift; sourceTree = "<group>"; };
 		7483E8EC83A1E5AB39FBFB69 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7C3409294A74788E840370E9 /* PS5Vision.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = PS5Vision.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7E194D8320ACDB6BF794C59A /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		B812C021F2281FD5E49EDF25 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C10C6B7B6F58406F4C3DBA25 /* Bridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bridge.swift; sourceTree = "<group>"; };
 		DF87BE522F0FD7BBB06615B1 /* ConsoleSpot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsoleSpot.swift; sourceTree = "<group>"; };
 		EF96C03F0472B11FBD6619CD /* PS5VisionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PS5VisionApp.swift; sourceTree = "<group>"; };
@@ -35,11 +41,14 @@
 			isa = PBXGroup;
 			children = (
 				7E194D8320ACDB6BF794C59A /* AppModel.swift */,
+				B812C021F2281FD5E49EDF25 /* Assets.xcassets */,
 				C10C6B7B6F58406F4C3DBA25 /* Bridge.swift */,
 				DF87BE522F0FD7BBB06615B1 /* ConsoleSpot.swift */,
+				55F42268EF2F00F4C953C0B2 /* Demo.html */,
 				7483E8EC83A1E5AB39FBFB69 /* Info.plist */,
 				4A57165E841B18B7471E1536 /* LauncherView.swift */,
 				671B3DAB99D062349AF14089 /* NativeController.swift */,
+				07A153AA5203886523905E9F /* PrivacyInfo.xcprivacy */,
 				EF96C03F0472B11FBD6619CD /* PS5VisionApp.swift */,
 				7235B6AF8B261A5E0843216E /* RoomView.swift */,
 				1913727A8BFA8B20BBFA50C5 /* ScreenView.swift */,
@@ -71,6 +80,7 @@
 			buildConfigurationList = 5D0D88B78B4575F2BBDFCB2E /* Build configuration list for PBXNativeTarget "PS5Vision" */;
 			buildPhases = (
 				C53F49119E16F88B02554A27 /* Sources */,
+				7A8A4F9B3C4725AD8A1A934E /* Resources */,
 			);
 			buildRules = (
 			);
@@ -117,6 +127,19 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		7A8A4F9B3C4725AD8A1A934E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F67161FB544DB8F6B62E9B2D /* Assets.xcassets in Resources */,
+				E2FED3D465B869DD4DB8A5ED /* Demo.html in Resources */,
+				55D6094C0CBFC770A4FBBB14 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		C53F49119E16F88B02554A27 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -147,9 +170,9 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = io.github.ps5vision.app;
-				PRODUCT_NAME = "PS5 Vision";
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.themaninhollywood.lookplay;
+				PRODUCT_NAME = "$(APP_NAME)";
 				SDKROOT = xros;
 				TARGETED_DEVICE_FAMILY = 7;
 			};
@@ -159,6 +182,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				APP_NAME = Lookplay;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -226,6 +250,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				APP_NAME = Lookplay;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -293,9 +318,9 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = io.github.ps5vision.app;
-				PRODUCT_NAME = "PS5 Vision";
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.themaninhollywood.lookplay;
+				PRODUCT_NAME = "$(APP_NAME)";
 				SDKROOT = xros;
 				TARGETED_DEVICE_FAMILY = 7;
 			};

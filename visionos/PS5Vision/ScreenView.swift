@@ -60,7 +60,9 @@ struct BridgeWebView: UIViewRepresentable {
         webView.backgroundColor = .black
         webView.scrollView.isScrollEnabled = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never
+        #if DEBUG
         webView.isInspectable = true
+        #endif
         webView.onScene = { [weak model] scene in
             model?.screenScene = scene
             scene?.lockScreenShape()
@@ -68,7 +70,13 @@ struct BridgeWebView: UIViewRepresentable {
         model.controller.sink = { [weak webView] script in
             webView?.evaluateJavaScript(script, completionHandler: nil)
         }
-        if let url = bridge.pageURL { webView.load(URLRequest(url: url)) }
+        if bridge.isDemo {
+            if let page = Bundle.main.url(forResource: "Demo", withExtension: "html") {
+                webView.loadFileURL(page, allowingReadAccessTo: page)
+            }
+        } else if let url = bridge.pageURL {
+            webView.load(URLRequest(url: url))
+        }
         return webView
     }
 
@@ -112,14 +120,14 @@ struct BridgeWebView: UIViewRepresentable {
                 completionHandler(.useCredential, URLCredential(trust: trust))
             } else {
                 completionHandler(.cancelAuthenticationChallenge, nil)
-                showProblem(in: webView, "This bridge's certificate is not the one PS5 Vision trusted before. If you reset the bridge on your Mac, remove the address in PS5 Vision and add it again.")
+                showProblem(in: webView, "This bridge's certificate is not the one \(appName) trusted before. If you reset the bridge on your Mac, remove the address in \(appName) and add it again.")
             }
         }
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
             let code = (error as NSError).code
             guard code != NSURLErrorCancelled else { return }
-            showProblem(in: webView, "Can't reach the bridge at \(bridge.host):\(bridge.port). Check that `npm start` is running on your Mac and that both are on the same Wi-Fi.")
+            showProblem(in: webView, "Can't reach the bridge at \(bridge.host):\(bridge.port). Check that the bridge is running on your Mac and that both are on the same Wi-Fi.")
         }
 
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {

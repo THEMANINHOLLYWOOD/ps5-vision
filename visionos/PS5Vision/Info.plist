@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>PS5 Vision</string>
+	<string>$(APP_NAME)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -33,7 +33,7 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>io.github.ps5vision.app</string>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>ps5vision</string>
@@ -41,18 +41,22 @@
 		</dict>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>PS5 Vision looks for the bridge running on your Mac, which streams your PS5.</string>
+	<string>Finds the bridge running on your Mac, which streams your console to this headset. Nothing leaves your home network.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_ps5vision._tcp</string>
 	</array>
 	<key>NSWorldSensingUsageDescription</key>
-	<string>PS5 Vision remembers where your PS5 is in the room, so you can look at it to connect.</string>
+	<string>Remembers where your console is in the room, so you can look at it to connect. Nothing about your room is stored outside this headset.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.entertainment</string>
 	<key>GCSupportsControllerUserInteraction</key>
 	<true/>
 	<key>GCSupportedGameControllers</key>

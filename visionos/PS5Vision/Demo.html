@@ -1,0 +1,171 @@
+<!doctype html>
+<!-- The demo: what the screen, the controller and rumble feel like, with no
+     console and no Mac. Everything is drawn here; nothing is loaded. -->
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #05071c; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #note, #pad {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    font: 500 2.1vw -apple-system, system-ui, sans-serif; color: #e9eeff;
+    background: rgba(12, 18, 64, .55); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255, 255, 255, .14); border-radius: 999px; padding: .7vw 1.8vw; white-space: nowrap;
+  }
+  #note { top: 3vh; }
+  #pad { bottom: 4vh; display: flex; gap: 1.2vw; align-items: center; font-size: 1.6vw; }
+  #pad b { font-weight: 600; opacity: .35; transition: opacity .08s; }
+  #pad b.on { opacity: 1; color: #7fdcff; }
+  #score { opacity: .8; margin-left: 1vw; }
+</style>
+<canvas id="sky"></canvas>
+<div id="note">Demo · no console connected</div>
+<div id="pad">
+  <span id="who">Move a stick or press a button on your controller</span>
+  <b data-bit="6">up</b><b data-bit="7">down</b><b data-bit="4">left</b><b data-bit="5">right</b>
+  <b data-bit="0">A</b><b data-bit="1">B</b><b data-bit="2">X</b><b data-bit="3">Y</b>
+  <b data-bit="8">L1</b><b data-bit="9">R1</b>
+  <span id="score"></span>
+</div>
+<script>
+'use strict';
+const canvas = document.getElementById('sky');
+const ctx = canvas.getContext('2d');
+let w = 0, h = 0;
+function fit() {
+  const scale = Math.min(window.devicePixelRatio || 1, 2);
+  w = canvas.width = Math.round(innerWidth * scale);
+  h = canvas.height = Math.round(innerHeight * scale);
+}
+addEventListener('resize', fit);
+fit();
+
+// What the controller is doing: from the app (window.ps5NativeInput), a
+// controller the browser sees, or the keyboard.
+let fromApp = { buttons: 0, l2: 0, r2: 0, lx: 0, ly: 0, rx: 0, ry: 0 };
+let lastInputAt = -10000;
+window.ps5NativeInput = (state) => {
+  fromApp = state;
+  if (state.buttons || state.l2 || state.r2 || Math.abs(state.lx) + Math.abs(state.ly) > 4000) lastInputAt = performance.now();
+};
+const keys = new Set();
+const KEY_STICK = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1], KeyA: [-1, 0], KeyD: [1, 0], KeyW: [0, -1], KeyS: [0, 1] };
+addEventListener('keydown', (e) => { keys.add(e.code); e.preventDefault(); });
+addEventListener('keyup', (e) => keys.delete(e.code));
+function keyboardInput() {
+  let x = 0, y = 0;
+  for (const code of keys) { const d = KEY_STICK[code]; if (d) { x += d[0]; y += d[1]; } }
+  return { buttons: keys.has('Space') || keys.has('Enter') ? 1 : 0, l2: 0, r2: keys.has('ShiftLeft') ? 255 : 0, lx: x * 32767, ly: y * 32767, rx: 0, ry: 0 };
+}
+
+function rumble(left, right, ms) {
+  const post = (l, r) => window.webkit?.messageHandlers?.ps5?.postMessage({ type: 'rumble', left: l, right: r });
+  post(left, right);
+  setTimeout(() => post(0, 0), ms);
+}
+
+// The scene: stars streaming past, a glider you steer, rings to fly through.
+const stars = Array.from({ length: 420 }, () => ({ x: Math.random() * 2 - 1, y: Math.random() * 2 - 1, z: Math.random() }));
+const glider = { x: 0, y: 0, vx: 0, vy: 0, roll: 0 };
+const pulses = [];
+let ring = newRing();
+let score = 0;
+let lastButtons = 0;
+function newRing() { return { x: Math.random() * 1.2 - 0.6, y: Math.random() * 0.8 - 0.4, z: 1 }; }
+
+const lit = [...document.querySelectorAll('#pad b')];
+const who = document.getElementById('who');
+const scoreText = document.getElementById('score');
+
+let before = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - before) / 1000);
+  before = now;
+  const input = keys.size ? keyboardInput() : fromApp;
+  if (keys.size) lastInputAt = now;
+  const idle = now - lastInputAt > 4000;
+
+  // Nobody playing: it flies itself, so there is always something to look at.
+  let sx = input.lx / 32767, sy = input.ly / 32767;
+  if (idle) { sx = Math.sin(now / 1400) * 0.8; sy = Math.sin(now / 900) * 0.55; }
+  const boost = 1 + (input.r2 / 255) * 1.6;
+  glider.vx += (sx * 1.5 - glider.vx) * Math.min(1, dt * 6);
+  glider.vy += (sy * 1.5 - glider.vy) * Math.min(1, dt * 6);
+  glider.x = Math.max(-0.85, Math.min(0.85, glider.x + glider.vx * dt));
+  glider.y = Math.max(-0.7, Math.min(0.7, glider.y + glider.vy * dt));
+  glider.roll += (glider.vx * 0.5 - glider.roll) * Math.min(1, dt * 8);
+
+  const pressed = input.buttons & ~lastButtons;
+  lastButtons = input.buttons;
+  if (pressed) {
+    pulses.push({ x: glider.x, y: glider.y, age: 0 });
+    rumble(160, 90, 160);
+  }
+
+  // Draw.
+  const sky = ctx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, '#16206b'); sky.addColorStop(0.55, '#0c1240'); sky.addColorStop(1, '#05071c');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, w, h);
+  const cx = w / 2 - glider.x * w * 0.06 + (input.rx / 32767) * w * 0.04;
+  const cy = h / 2 - glider.y * h * 0.06 + (input.ry / 32767) * h * 0.04;
+
+  ctx.lineCap = 'round';
+  for (const star of stars) {
+    const zBefore = star.z;
+    star.z -= dt * 0.22 * boost;
+    if (star.z <= 0.02) { star.x = Math.random() * 2 - 1; star.y = Math.random() * 2 - 1; star.z = 1; continue; }
+    const x1 = cx + (star.x / zBefore) * w * 0.5, y1 = cy + (star.y / zBefore) * h * 0.5;
+    const x2 = cx + (star.x / star.z) * w * 0.5, y2 = cy + (star.y / star.z) * h * 0.5;
+    ctx.strokeStyle = `rgba(190, 215, 255, ${Math.min(1, 1.1 - star.z)})`;
+    ctx.lineWidth = Math.max(1, (1 - star.z) * w * 0.0022);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  }
+
+  ring.z -= dt * 0.3 * boost;
+  if (ring.z <= 0.12) {
+    if (Math.hypot(ring.x - glider.x, ring.y - glider.y) < 0.22) {
+      score += 1;
+      pulses.push({ x: glider.x, y: glider.y, age: 0 });
+      rumble(255, 200, 220);
+    }
+    ring = newRing();
+  }
+  const near = 0.12 / ring.z;
+  const rx = w / 2 + ring.x * w * 0.5 * near, ry = h / 2 + ring.y * h * 0.5 * near;
+  ctx.strokeStyle = `rgba(63, 208, 255, ${Math.min(1, near * 1.4)})`;
+  ctx.lineWidth = w * 0.008 * near;
+  ctx.shadowColor = '#3fd0ff'; ctx.shadowBlur = w * 0.03 * near;
+  ctx.beginPath(); ctx.ellipse(rx, ry, w * 0.11 * near, w * 0.11 * near, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  for (const pulse of pulses) {
+    pulse.age += dt;
+    ctx.strokeStyle = `rgba(169, 216, 255, ${Math.max(0, 1 - pulse.age * 1.6)})`;
+    ctx.lineWidth = w * 0.004;
+    ctx.beginPath();
+    ctx.arc(w / 2 + pulse.x * w * 0.5, h / 2 + pulse.y * h * 0.5, pulse.age * w * 0.3, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  while (pulses.length && pulses[0].age > 0.7) pulses.shift();
+
+  // The glider: a paper dart, tilting into its turns.
+  const gx = w / 2 + glider.x * w * 0.5, gy = h / 2 + glider.y * h * 0.5, unit = w * 0.03;
+  ctx.save();
+  ctx.translate(gx, gy);
+  ctx.rotate(glider.roll);
+  ctx.shadowColor = '#7aa2ff'; ctx.shadowBlur = unit * (0.8 + boost * 0.5);
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.moveTo(0, -unit); ctx.lineTo(unit * 1.5, unit * 0.7); ctx.lineTo(0, unit * 0.25); ctx.lineTo(-unit * 1.5, unit * 0.7); ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  for (const mark of lit) mark.classList.toggle('on', Boolean(input.buttons & (1 << Number(mark.dataset.bit))));
+  who.textContent = idle ? 'Move a stick or press a button on your controller' : 'You are flying · R2 goes faster';
+  scoreText.textContent = score ? `Rings ${score}` : '';
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</html>

@@ -82,7 +82,7 @@ private struct ConnectBadge: View {
             } else {
                 Text("Start the bridge on your Mac")
                     .font(.title.weight(.semibold))
-                Text("In the ps5-vision folder, run npm start")
+                Text("It streams your console to this headset")
                     .font(.title3)
                     .foregroundStyle(.secondary)
             }

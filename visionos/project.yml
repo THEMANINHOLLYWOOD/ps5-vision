@@ -14,6 +14,10 @@ settings:
     CODE_SIGN_STYLE: Automatic
     # Set your own team in Xcode (Signing & Capabilities) to run on a headset.
     DEVELOPMENT_TEAM: ""
+    # The name people see: on the home view, in the app and in the App Store.
+    # It has to be a name of your own. Apple turns away apps named after
+    # someone else's product, so "PS5" and "PlayStation" can't be in it.
+    APP_NAME: Lookplay
 targets:
   PS5Vision:
     type: application
@@ -22,10 +26,11 @@ targets:
       - path: PS5Vision
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: io.github.ps5vision.app
-        PRODUCT_NAME: PS5 Vision
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.themaninhollywood.lookplay
+        PRODUCT_NAME: $(APP_NAME)
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_FILE: PS5Vision/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         TARGETED_DEVICE_FAMILY: "7"
-        MARKETING_VERSION: "0.1.0"
+        MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"

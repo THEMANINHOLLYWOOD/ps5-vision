@@ -12,7 +12,7 @@ struct LauncherView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("PS5 Vision")
+                Text(appName)
                     .font(.extraLargeTitle2)
                 Text(statusLine)
                     .foregroundStyle(.secondary)
@@ -33,6 +33,22 @@ struct LauncherView: View {
                     Label(model.roomOpen ? "Stop looking for PS5" : "Look at my PS5", systemImage: "eye")
                 }
                 .disabled(!model.spotSaved && !model.roomOpen)
+            }
+
+            if model.bridge == nil {
+                // No Mac set up yet (or just curious): the screen, a
+                // controller and rumble can all be tried without one.
+                HStack(spacing: 14) {
+                    Button {
+                        openWindow(id: "screen", value: Bridge.demo)
+                    } label: {
+                        Label("Try the demo", systemImage: "sparkles.rectangle.stack")
+                    }
+                    .disabled(model.screenOpen)
+                    Link(destination: setupGuide) {
+                        Label("Set up your Mac", systemImage: "desktopcomputer")
+                    }
+                }
             }
 
             Button {
@@ -68,7 +84,7 @@ struct LauncherView: View {
                             }
                         }
                     }
-                    Text("Only needed if the bridge isn't found by itself. Use the https address that npm start prints.")
+                    Text("Only needed if the bridge isn't found by itself. Use the https address the bridge prints when it starts.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -86,7 +102,8 @@ struct LauncherView: View {
             }
         }
         // ps5vision://connect opens the screen (handy from Shortcuts),
-        // ps5vision://room looks for the PS5, ps5vision://place moves its spot.
+        // ps5vision://room looks for the PS5, ps5vision://place moves its spot,
+        // ps5vision://demo opens the built-in demo.
         .onOpenURL { url in
             Task { await follow(url) }
         }
@@ -98,6 +115,8 @@ struct LauncherView: View {
             // The bridge may still be being looked for when the link arrives.
             for _ in 0..<50 where model.bridge == nil { try? await Task.sleep(for: .milliseconds(100)) }
             if let bridge = model.bridge, !model.screenOpen { openWindow(id: "screen", value: bridge) }
+        case "demo":
+            if !model.screenOpen { openWindow(id: "screen", value: Bridge.demo) }
         case "room":
             await setRoom(open: true)
         case "place":
@@ -115,7 +134,7 @@ struct LauncherView: View {
         } else if let problem = model.browser.problem {
             parts.append(problem)
         } else {
-            parts.append("Looking for the bridge… run npm start on your Mac.")
+            parts.append("Looking for the bridge on your Mac… It streams your console to this headset.")
         }
         parts.append(model.controller.name.map { "Controller: \($0)" }
                      ?? "No controller yet: pair one with this headset in Settings > Bluetooth.")

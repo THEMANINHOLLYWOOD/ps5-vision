@@ -69,7 +69,7 @@ fi
 
 # --- build, install, open ------------------------------------------------
 BUNDLE_ID="io.github.ps5vision.app.$(tr 'A-Z' 'a-z' <<<"$TEAM")"
-echo "Building PS5 Vision for your headset (this takes a minute the first time)…"
+echo "Building the app for your headset (this takes a minute the first time)…"
 xcodebuild -project "$PROJECT" -scheme PS5Vision -configuration Debug \
   -destination "id=$DEVICE" -derivedDataPath "$DERIVED" \
   -allowProvisioningUpdates \
@@ -82,13 +82,14 @@ xcodebuild -project "$PROJECT" -scheme PS5Vision -configuration Debug \
     exit 1
   }
 
-APP="$DERIVED/Build/Products/Debug-xros/PS5 Vision.app"
+APP="$(find "$DERIVED/Build/Products/Debug-xros" -maxdepth 1 -name '*.app' | head -1)"
+NAME="$(basename "$APP" .app)"
 echo "Installing on the headset…"
 xcrun devicectl device install app --device "$DEVICE" "$APP" >/dev/null
 echo "Opening it…"
 if ! xcrun devicectl device process launch --device "$DEVICE" "$BUNDLE_ID" >/dev/null 2>&1; then
   echo "Installed. The first time, the headset may ask you to trust your developer"
-  echo "account: Settings > General > VPN & Device Management. Then open PS5 Vision."
+  echo "account: Settings > General > VPN & Device Management. Then open $NAME."
   exit 0
 fi
-echo "PS5 Vision is open on your headset."
+echo "$NAME is open on your headset."

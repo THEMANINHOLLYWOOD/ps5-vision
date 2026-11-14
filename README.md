@@ -232,10 +232,14 @@ the headset. (Or open it in Xcode with `npm run vision` and press Run.) The
 first time, the headset may ask you to trust your developer account under
 Settings > General > VPN & Device Management.
 
-Then, with `npm start` running on the Mac: open PS5 Vision, choose **Show the
-app where your PS5 is**, drag the blue ring onto the console and press Done.
+Then, with `npm start` running on the Mac: open the app (it is called
+Lookplay on the headset), choose **Show the app where your PS5 is**, drag the blue ring onto the console and press Done.
 From then on, opening the app and looking at the PS5 is all it takes. Allow
 Local Network access when asked, or the app can't find the bridge.
+
+With no bridge in reach the app offers **Try the demo**: the same screen, with a
+small built-in scene you steer with your controller. Nothing else needs to be
+set up for it.
 
 `ps5vision://connect` opens the screen straight away, for example from a
 Shortcut. The project is generated from `visionos/project.yml` with
@@ -245,6 +249,22 @@ Optional: a scanned model of your console makes the app find it by sight
 instead of by the spot you showed it. Make one with Create ML's Object
 Tracking template from a 3D scan of the PS5 (Reality Composer on an iPhone
 can make the scan), and add the resulting `.referenceobject` file to the app.
+
+### Putting it in the App Store
+
+The app carries what the App Store asks for: an icon, a privacy file, the demo
+for reviewers, and a name of its own (`APP_NAME` in `visionos/project.yml`;
+Apple turns away apps named after someone else's product). With a paid Apple
+Developer Program membership:
+
+```bash
+npm run vision:release
+```
+
+builds, signs and uploads it to App Store Connect. The steps around that, and
+the listing text to paste, are in
+[docs/app-store/SUBMITTING.md](docs/app-store/SUBMITTING.md). To see that it
+builds without any account: `npm run vision:release -- --check`.
 
 ## If something is off
 

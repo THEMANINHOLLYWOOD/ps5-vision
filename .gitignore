@@ -6,6 +6,9 @@ vendor/
 # Your console pairing and this machine's TLS key. Never commit these.
 config/
 
+# Copies iCloud makes of the Xcode project when it is regenerated in a synced folder
+visionos/PS5Vision [0-9]*.xcodeproj/
+
 # Xcode's per-person files
 xcuserdata/
 *.xcuserstate

@@ -124,10 +124,17 @@ const ANSWER_SCHEMA = JSON.stringify({
 // Asks Claude. image: a JPEG as a Buffer, or null when only a name is known.
 // Resolves with its raw answer (an object); it still has to be sanitized.
 export function askClaude({ claudePath, image = null, gameName = '', timeoutMs = ASK_TIMEOUT_MS }) {
+  return runClaude({ claudePath, system: SYSTEM, schema: ANSWER_SCHEMA, model: MODEL, image, text: layoutRequest(gameName), timeoutMs });
+}
+
+// One question to Claude, with an optional picture, answered as JSON of the
+// given shape. Claude Code is run with no tools and none of the user's
+// settings, in an empty folder: it can only answer.
+export function runClaude({ claudePath, system, schema, text, image = null, model = MODEL, timeoutMs = ASK_TIMEOUT_MS }) {
   return new Promise((resolve, reject) => {
     const content = [];
     if (image) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image.toString('base64') } });
-    content.push({ type: 'text', text: layoutRequest(gameName) });
+    content.push({ type: 'text', text });
 
     let workDir;
     try {
@@ -142,9 +149,9 @@ export function askClaude({ claudePath, image = null, gameName = '', timeoutMs =
       '--input-format', 'stream-json',
       '--output-format', 'stream-json',
       '--verbose',
-      '--json-schema', ANSWER_SCHEMA,
-      '--model', MODEL,
-      '--system-prompt', SYSTEM,
+      '--json-schema', schema,
+      '--model', model,
+      '--system-prompt', system,
       '--restricted', // no settings, hooks or plugins of the user's
       '--tools', '', // nothing to act with: it can only answer
       '--strict-mcp-config',
@@ -190,7 +197,7 @@ export function askClaude({ claudePath, image = null, gameName = '', timeoutMs =
       if (!answer && typeof result.result === 'string') {
         try { answer = JSON.parse(result.result); } catch { /* handled below */ }
       }
-      if (!answer || typeof answer !== 'object') finish(new Error('Claude answered, but not with a layout.'));
+      if (!answer || typeof answer !== 'object') finish(new Error('Claude answered, but not in the shape asked for.'));
       else finish(null, answer);
     });
     child.stdin.on('error', () => {}); // exited early; 'exit' reports it

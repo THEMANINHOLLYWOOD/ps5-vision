@@ -30,6 +30,15 @@ struct PS5VisionApp: App {
         }
         .defaultSize(width: 900, height: 506)
 
+        // Anything on the web in a panel of its own, live beside the game:
+        // the PS5 shows one thing at a time, the headset need not.
+        WindowGroup(id: "web", for: WebPanelSpec.self) { $spec in
+            if let spec {
+                WebPanelView(spec: spec)
+            }
+        }
+        .defaultSize(width: 1100, height: 660)
+
         // The room exactly as it looks, plus a Connect button over the PS5.
         ImmersiveSpace(id: "room") {
             RoomView()

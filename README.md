@@ -197,6 +197,30 @@ The page also has a link for viewing an **HDMI capture card** plugged into the
 device you are playing on, as a lower-latency alternative that does not use
 Remote Play at all.
 
+## The pilot: tell the PS5 where to go
+
+Under **More** on the page (and under the screen in the Vision Pro app) there
+is a box: **Take me to…** Type "the home screen", "YouTube" or "my media apps"
+and press Go. Claude, on your Mac, looks at the PS5's screen, works out which
+buttons to press, presses them, looks again, and carries on until the PS5 is
+where you asked, saying what it is doing as it goes. You watch it happen.
+
+It needs Claude Code on the Mac (the same as **Build for this game**) and
+`ffmpeg` (`brew install ffmpeg`), which is how the bridge takes a look at the
+picture. A trip takes a quarter of a minute to a minute: every look is a
+question to Claude.
+
+What it will not do:
+
+- **Close a game that is running.** A PS5 runs one game at a time, and opening
+  another closes the first, often without asking. The pilot checks first, and
+  if a game is running it stops and tells you; ask again and say it may be
+  closed ("close Call of Duty and open Astro's Playroom").
+- **Buy, download, delete, sign out, change settings or power off.** It can
+  only answer with button names, the bridge presses only the D-pad, the face
+  buttons, L1, R1, Options and PS, and when the PS5 asks about anything that
+  costs money or progress, it stops and passes the question to you.
+
 ## The Vision Pro app
 
 There is also a native app for Vision Pro in [`visionos/`](visionos). It plays
@@ -224,6 +248,10 @@ the same stream, and adds what a web page can't:
   panel keep what it was showing while the game goes on. The PS5 sends one
   picture, so panels are windows on that picture: two things can't run live
   side by side.
+- **Web panels.** The PS5 shows one thing at a time; the headset need not.
+  **Web panel** opens anything on the web (a video, a stream, a guide) in a
+  panel that plays in the headset itself, live beside the game, with its own
+  sound.
 - **Controls made for the game.** **Build for this game** has Claude (on your
   Mac, as for the keyboard) decide which gesture does what in the game on
   screen: in a shooter the right middle finger fires and the left one aims.
@@ -336,6 +364,15 @@ PS5 and the Mac are doing their part or which of them is the weak point. (It
 takes over the stream from whoever is playing.)
 
 ## What it does not do (yet)
+
+- **Two live pictures from one PS5.** The console sends one picture and runs
+  one game at a time (plus one suspended media app); that is Sony's limit, not
+  this bridge's. What gets close: web panels for media, panels on parts of the
+  picture, and the pilot to move the PS5 from one thing to the next.
+  PlayStation's cloud streaming could be a second live game, and an
+  open-source client for it exists ([Pylux](https://github.com/ForWard-Technologies-LLC/Pylux)),
+  but it needs your PSN login token, is against PSN's terms, and was reported
+  broken in November 2026. It is not built in.
 
 - **Play away from home.** The bridge only talks to devices on your own
   network. A VPN into your home network (Tailscale, WireGuard) should work in

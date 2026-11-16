@@ -7,6 +7,8 @@ import { CONTROLLER_STATE_SIZE, ConsoleSource, DemoSource } from './source.js';
 import { discover, locateConsole, wakeup } from './discovery.js';
 import { keepAwake } from './awake.js';
 import { wirelessDisplay } from './sharing.js';
+import { isKeyframe } from './h264.js';
+import { toJpeg } from './eyes.js';
 
 const RESOLUTIONS = [360, 540, 720, 1080];
 const IDLE_STOP_MS = 10_000;
@@ -94,6 +96,8 @@ export class Bridge {
     this.viewer = null;
     this.nextViewerId = 1;
     this.panels = new Set();
+    this.stillWaiters = new Set(); // waiting for the next whole picture (see still())
+    this.pilotState = null; // the controller, while the pilot is pressing a button
     this.source = null;
     this.sourceOptions = null;
     this.sourceConnected = false;
@@ -145,7 +149,9 @@ export class Bridge {
         viewer.sendControl({ type: 'ended', error: true, message: 'The bridge could not start the stream. Its window on the Mac has the details.' });
       });
     });
-    viewer.on('input', (state) => this.source?.sendController(state));
+    // While the pilot holds a button, that is what the PS5 gets: the page's
+    // own stream of "nothing pressed" would let go of it at once.
+    viewer.on('input', (state) => this.source?.sendController(this.pilotState ?? state));
     viewer.on('control', (message) => this.#onControl(viewer, message));
     viewer.on('closed', () => this.#detach(viewer));
     // No input can arrive during a hiccup: don't leave a button or stick held.
@@ -196,6 +202,44 @@ export class Bridge {
     }, CONNECT_TIMEOUT_MS).unref();
     const sdp = await panel.createOffer();
     return { id: panel.id, sdp };
+  }
+
+  // What the console is showing right now, as a JPEG. A picture can only be
+  // read from a keyframe, so one is asked for and waited on.
+  async still({ ffmpegPath, timeoutMs = 5000 } = {}) {
+    if (!this.source || !this.sourceConnected) throw Object.assign(new Error('Nothing is playing yet.'), { status: 409 });
+    if (!ffmpegPath) throw Object.assign(new Error('Looking at the screen needs ffmpeg on the Mac that runs the bridge: brew install ffmpeg'), { status: 503 });
+    const keyframe = await new Promise((resolve, reject) => {
+      const waiter = (unit) => {
+        clearTimeout(timer);
+        resolve(unit);
+      };
+      const timer = setTimeout(() => {
+        this.stillWaiters.delete(waiter);
+        reject(Object.assign(new Error('The PS5 sent no fresh picture.'), { status: 504 }));
+      }, timeoutMs);
+      this.stillWaiters.add(waiter);
+      this.#requestKeyframe(true);
+    });
+    const hevc = this.sourceOptions.codec === 'h265';
+    return toJpeg({ ffmpegPath, keyframe: this.header ? Buffer.concat([this.header, keyframe]) : keyframe, hevc });
+  }
+
+  // Presses buttons for the pilot: down for holdMs, then up.
+  async press(buttons, holdMs) {
+    if (!this.source) throw Object.assign(new Error('Nothing is playing yet.'), { status: 409 });
+    const down = Buffer.alloc(CONTROLLER_STATE_SIZE);
+    down.writeUInt32LE(buttons >>> 0, 0);
+    this.pilotState = down;
+    this.source.sendController(down);
+    await new Promise((resolve) => setTimeout(resolve, holdMs));
+    this.pilotState = null;
+    this.source?.sendController(Buffer.alloc(CONTROLLER_STATE_SIZE));
+  }
+
+  // A line for whoever is watching (the pilot's running commentary).
+  tell(message) {
+    this.viewer?.sendControl(message);
   }
 
   answer(id, sdp) {
@@ -379,6 +423,11 @@ export class Bridge {
     });
     source.on('video', (unit, tsUs) => {
       this.lastMediaAt = Date.now();
+      if (this.stillWaiters.size && isKeyframe(unit, this.sourceOptions?.codec === 'h265')) {
+        const waiters = [...this.stillWaiters];
+        this.stillWaiters.clear();
+        for (const waiter of waiters) waiter(unit);
+      }
       const v = this.viewer;
       if (v && !v.pushVideo(unit, tsUs) && v.ready && v.needKeyframe) this.#requestKeyframe(false);
       for (const panel of this.panels) {

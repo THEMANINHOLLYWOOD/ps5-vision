@@ -49,6 +49,12 @@
         <button id="btn-fullscreen" type="button">Fullscreen</button>
         <button id="btn-refresh" type="button">Refresh picture</button>
         <button id="btn-rest" type="button">End and rest PS5</button>
+        <!-- The pilot: Claude, on the Mac, drives the PS5 there for you. -->
+        <form id="pilot" class="pilot" hidden>
+          <input id="pilot-goal" type="text" maxlength="140" autocomplete="off" autocapitalize="off" spellcheck="false"
+                 placeholder="Take me to… (a game, an app)" aria-label="Where should the PS5 go?">
+          <button id="btn-pilot" type="submit">Go</button>
+        </form>
       </div>
     </header>
 

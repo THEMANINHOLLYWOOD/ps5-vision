@@ -121,6 +121,8 @@ struct LauncherView: View {
             if let bridge = model.bridge, !model.screenOpen { openWindow(id: "screen", value: bridge) }
         case "demo":
             if !model.screenOpen { openWindow(id: "screen", value: Bridge.demo) }
+        case "web":
+            openWindow(id: "web", value: WebPanelSpec())
         case "panel":
             // The screen, and once it is playing, its middle as a panel.
             for _ in 0..<50 where model.bridge == nil { try? await Task.sleep(for: .milliseconds(100)) }

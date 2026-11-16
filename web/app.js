@@ -569,6 +569,10 @@ function onControl(connection, raw) {
     case 'rumble':
       rumble(message.left, message.right);
       break;
+    case 'pilot':
+      // The pilot's running commentary while it drives the PS5.
+      notePilot(String(message.text ?? ''), Boolean(message.busy));
+      break;
     case 'replaced':
       teardown();
       showEnded('The stream was opened somewhere else.', false);
@@ -895,6 +899,7 @@ async function loadBuiltLayouts() {
   layoutsLoaded = true;
   builtLayouts = Array.isArray(data.layouts) ? data.layouts : [];
   $('build-row').hidden = !data.canBuild;
+  $('pilot').hidden = !data.canPilot;
   fillLayoutChoices();
   // The layout chosen last time may be one of these.
   const saved = savedLayoutId();
@@ -950,6 +955,48 @@ async function buildForGame() {
     nativeBridge()?.postMessage({ type: 'build-note', text: $('build-note').textContent, busy: false });
   }
 }
+// ------------------------------------------------------------------ pilot
+//
+// "Open YouTube", "switch to Astro Bot": Claude, on the Mac, looks at the
+// PS5's screen and presses the buttons to get there (server/pilot.js). It is
+// told where to go here, and says what it is doing as it goes.
+let piloting = false;
+
+function notePilot(text, busy) {
+  piloting = busy;
+  $('btn-pilot').textContent = busy ? 'Stop' : 'Go';
+  if (text) showToast(text, busy ? 60_000 : 8000);
+  nativeBridge()?.postMessage({ type: 'pilot', text, busy });
+}
+
+async function pilotTo(goal) {
+  const where = String(goal ?? '').trim();
+  if (piloting) {
+    api('/api/pilot/stop', {}).catch(() => {});
+    return;
+  }
+  if (!where) return;
+  if (!streaming) {
+    notePilot('Start playing first, so the pilot can see your PS5.', false);
+    return;
+  }
+  notePilot('Looking at your PS5…', true);
+  try {
+    // Minutes, not seconds: every look is a question to Claude.
+    await api('/api/pilot', { goal: where }, 15 * 60_000);
+    $('pilot-goal').value = '';
+  } catch (err) {
+    notePilot(err.message, false);
+  }
+}
+window.ps5Pilot = pilotTo;
+$('pilot').addEventListener('submit', (event) => {
+  event.preventDefault();
+  pilotTo($('pilot-goal').value);
+});
+// Typing a destination is not playing: keep the keys away from the game.
+for (const type of ['keydown', 'keyup']) $('pilot-goal').addEventListener(type, (event) => event.stopPropagation());
+
 // The app's own "Build for this game" button, next to its hand controls.
 window.ps5BuildForGame = () => {
   if (!$('btn-build').disabled) buildForGame();

@@ -24,6 +24,8 @@ import { bonjourName, ensureCertificate, localAddresses } from './tls.js';
 import { advertise } from './bonjour.js';
 import { LayoutStore, MAX_IMAGE_BYTES, buildLayout, findClaude } from './layouts.js';
 import { X509Certificate } from 'node:crypto';
+import { findFfmpeg } from './eyes.js';
+import { askPilot, cleanGoal, pilot } from './pilot.js';
 
 const WEB_DIR = path.join(ROOT, 'web');
 const STATIC_FILES = {
@@ -197,8 +199,67 @@ function createHandler(bridge, info, log) {
         sendJson(res, 200, { ok: true });
         return;
       }
+      if (req.method === 'GET' && url.pathname === '/api/still') {
+        // What the PS5 is showing right now, as a picture.
+        const jpeg = await bridge.still({ ffmpegPath: info.ffmpegPath });
+        res.writeHead(200, { 'content-type': 'image/jpeg', 'content-length': jpeg.length, 'cache-control': 'no-store' });
+        res.end(jpeg);
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/pilot/stop') {
+        info.pilotStopped = true;
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/pilot') {
+        // "Open YouTube", "switch to Astro Bot": Claude looks at the screen
+        // and presses the buttons to get there (see pilot.js).
+        if (!info.claudePath) {
+          sendJson(res, 503, { error: 'The pilot needs Claude Code on the Mac that runs the bridge. Install it from claude.com/claude-code, sign in once, and start the bridge again.' });
+          return;
+        }
+        if (info.piloting) {
+          sendJson(res, 429, { error: 'The pilot is already on its way somewhere. Stop it first, or give it a moment.' });
+          return;
+        }
+        const body = await readJson(req);
+        const goal = cleanGoal(body?.goal);
+        if (!goal) {
+          sendJson(res, 400, { error: 'Say where to go: a game, an app, or a screen.' });
+          return;
+        }
+        info.piloting = true;
+        info.pilotStopped = false;
+        log(`pilot: "${goal.replace(/[^\x20-\x7e]/g, '?')}"`);
+        const say = (text, extra = {}) => {
+          log(`pilot: ${text.replace(/[^\x20-\x7e]/g, '?')}`);
+          bridge.tell({ type: 'pilot', text, busy: true, ...extra });
+        };
+        try {
+          say('Looking at your PS5…');
+          const result = await pilot({
+            goal,
+            look: () => bridge.still({ ffmpegPath: info.ffmpegPath }),
+            press: (buttons, holdMs) => bridge.press(buttons, holdMs),
+            ask: (question) => askPilot({ claudePath: info.claudePath, ...question }),
+            say,
+            stopped: () => info.pilotStopped,
+          });
+          bridge.tell({ type: 'pilot', text: result.say, busy: false, done: result.done });
+          log(`pilot: ${result.done ? 'there' : 'stopped'} after ${result.steps} look${result.steps === 1 ? '' : 's'}`);
+          sendJson(res, 200, result);
+        } catch (err) {
+          log(`pilot: ${err.message}`);
+          const text = err.status ? err.message : 'The pilot could not go on. The bridge\'s window on the Mac says why.';
+          bridge.tell({ type: 'pilot', text, busy: false, done: false });
+          sendJson(res, err.status ?? 502, { error: text });
+        } finally {
+          info.piloting = false;
+        }
+        return;
+      }
       if (req.method === 'GET' && url.pathname === '/api/layouts') {
-        sendJson(res, 200, { canBuild: Boolean(info.claudePath), layouts: info.layouts.list() });
+        sendJson(res, 200, { canBuild: Boolean(info.claudePath), canPilot: Boolean(info.claudePath && info.ffmpegPath), layouts: info.layouts.list() });
         return;
       }
       if (req.method === 'POST' && url.pathname === '/api/layouts') {
@@ -291,6 +352,8 @@ async function main() {
     limiter: new AttemptLimiter(),
     // Keyboard layouts built for particular games, and what builds them.
     layouts: new LayoutStore(path.join(CONFIG_DIR, 'layouts.json')),
+    // The bridge's eyes, for the pilot (see eyes.js, pilot.js).
+    ffmpegPath: findFfmpeg(),
     claudePath: findClaude(),
     building: false,
   };

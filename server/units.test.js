@@ -12,6 +12,7 @@ import { BUTTON, encodeState, idleState, readGamepad, statesEqual } from '../web
 import { BUTTON_TARGETS, HAND_GESTURES, KEY_GUIDE, KEY_MAP, LAYOUTS, TARGETS, compileLayout, findLayout, guideFor, isMappedKey, keyboardState, mergeStates, mouseToStick, sanitizeLayout, sanitizeVision, unreachable } from '../web/keyboard.js';
 import { LayoutStore, buildLayout, cleanGameName, findClaude, layoutRequest } from './layouts.js';
 import { readCrop } from '../web/panel.js';
+import { PILOT_BUTTONS, cleanGoal, pilot, pressFor, sanitizeStep } from './pilot.js';
 import { wirelessDisplayIn } from './sharing.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -678,4 +679,66 @@ test('a panel shows the part of the picture asked for, or all of it', () => {
   assert.deepEqual(readCrop('?crop=0.9,0.9,0.5,2'), { x: 0.5, y: 0, width: 0.5, height: 1 });
   assert.deepEqual(readCrop('?crop=a,b,c,d'), { x: 0, y: 0, width: 1, height: 1 });
   assert.equal(readCrop('?crop=0,0,0,0').width, 0.02);
+});
+
+// ------------------------------------------------------------------- pilot
+
+test('the pilot presses only the buttons it is allowed, and only a few at a time', () => {
+  const step = sanitizeStep({ seen: 'home <b>', say: 'Going right.', done: false, stuck: false, press: ['DPAD_RIGHT', 'L2', 'TOUCHPAD', 'eval()', 'CROSS', ...Array(20).fill('DPAD_RIGHT')] });
+  assert.deepEqual(step.press.slice(0, 2), ['DPAD_RIGHT', 'CROSS']);
+  assert.equal(step.press.length, 6);
+  assert.ok(step.press.every((name) => PILOT_BUTTONS.includes(name)));
+  assert.equal(step.seen, 'home b');
+  // Done or stuck presses nothing, whatever else it said.
+  assert.deepEqual(sanitizeStep({ done: true, press: ['CROSS'] }).press, []);
+  assert.deepEqual(sanitizeStep({ stuck: true, press: ['CROSS'] }).press, []);
+  // Nothing to press and not done is stuck, not a loop.
+  assert.equal(sanitizeStep({ press: [] }).stuck, true);
+  assert.equal(sanitizeStep(null).stuck, true);
+  assert.equal(pressFor('PS_HOLD').buttons, BUTTON.PS);
+  assert.ok(pressFor('PS_HOLD').holdMs > pressFor('PS').holdMs * 5);
+  assert.equal(cleanGoal('  open `YouTube`\n<now> {x}  '), 'open YouTube now x');
+  assert.equal(cleanGoal('a'.repeat(500)).length, 140);
+});
+
+test('the pilot looks, presses, looks again, and stops when there, stuck, or told to', async () => {
+  const pressed = [];
+  const said = [];
+  const answers = [
+    { seen: 'a game', say: 'Going home.', press: ['PS_HOLD'], done: false, stuck: false },
+    { seen: 'home, games row', say: 'Over to Media.', press: ['R1', 'DPAD_RIGHT'], done: false, stuck: false },
+    { seen: 'YouTube open', say: 'YouTube is open.', press: [], done: true, stuck: false },
+  ];
+  let looks = 0;
+  const run = (extra = {}) => pilot({
+    goal: 'Open YouTube',
+    look: async () => { looks += 1; return Buffer.from([0xff, 0xd8]); },
+    press: async (buttons, holdMs) => { pressed.push([buttons, holdMs]); },
+    ask: async ({ goal, history }) => {
+      assert.equal(goal, 'Open YouTube');
+      return answers[history.length];
+    },
+    say: (text) => said.push(text),
+    pause: async () => {},
+    ...extra,
+  });
+  const result = await run();
+  assert.deepEqual(result, { done: true, say: 'YouTube is open.', steps: 3 });
+  assert.equal(looks, 3);
+  assert.deepEqual(pressed.map(([buttons]) => buttons), [BUTTON.PS, BUTTON.R1, BUTTON.DPAD_RIGHT]);
+  assert.deepEqual(said, ['Going home.', 'Over to Media.'], 'how it ended is the result, not one more remark');
+
+  // The PS5 asks to close the game: it stops and passes the question on.
+  pressed.length = 0;
+  const asked = await run({ ask: async () => ({ seen: 'Close game? dialog', say: 'The PS5 asks whether to close Call of Duty; choose with your controller.', press: ['CROSS'], done: false, stuck: true }) });
+  assert.equal(asked.done, false);
+  assert.match(asked.say, /close Call of Duty/);
+  assert.deepEqual(pressed, []);
+
+  // It never goes round for ever, and stops when asked to.
+  const lost = await run({ ask: async () => ({ seen: 'x', say: 'Trying.', press: ['DPAD_RIGHT'], done: false, stuck: false }), maxSteps: 4 });
+  assert.equal(lost.done, false);
+  assert.equal(lost.steps, 4);
+  const halted = await run({ stopped: () => true });
+  assert.deepEqual(halted, { done: false, say: 'Stopped.', steps: 0 });
 });

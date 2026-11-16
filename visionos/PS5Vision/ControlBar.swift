@@ -6,7 +6,9 @@ struct ControlBar: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
+    @Environment(\.openWindow) private var openWindow
     @State private var switching = false
+    @State private var goal = ""
 
     var body: some View {
         VStack(spacing: 10) {
@@ -46,6 +48,24 @@ struct ControlBar: View {
                 .disabled(model.building)
             }
             .toggleStyle(.button)
+            // The pilot: say where to go, and Claude drives the PS5 there
+            // while you watch. Next to it, a panel for anything on the web,
+            // live beside the game.
+            HStack(spacing: 8) {
+                TextField("Take me to… (a game, an app)", text: $goal)
+                    .textFieldStyle(.roundedBorder)
+                    .autocorrectionDisabled()
+                    .frame(width: 380)
+                    .onSubmit(go)
+                    .disabled(model.screenIsDemo)
+                Button(model.piloting ? "Stop" : "Go", action: go)
+                    .disabled(model.screenIsDemo || (!model.piloting && goal.trimmingCharacters(in: .whitespaces).isEmpty))
+                Button {
+                    openWindow(id: "web", value: WebPanelSpec())
+                } label: {
+                    Label("Web panel", systemImage: "globe")
+                }
+            }
             if let note {
                 Text(note)
                     .font(.callout)
@@ -58,8 +78,18 @@ struct ControlBar: View {
         .glassBackgroundEffect()
     }
 
+    /// Hands the goal to the page, which asks the bridge; while the pilot is
+    /// on its way, the same button stops it.
+    private func go() {
+        let where_ = model.piloting ? "stop" : goal.trimmingCharacters(in: .whitespaces)
+        guard !where_.isEmpty, let json = try? JSONEncoder().encode(where_), let text = String(data: json, encoding: .utf8) else { return }
+        model.controller.sink?("window.ps5Pilot&&ps5Pilot(\(text))")
+        if !model.piloting { goal = "" }
+    }
+
     private var note: String? {
         if model.handsOn, model.theaterOpen, let problem = model.hands.problem { return problem }
+        if model.piloting || !model.pilotNote.isEmpty { return model.pilotNote }
         if !model.buildNote.isEmpty { return model.buildNote }
         if model.controls.built { return "Controls for \(model.controls.game)" }
         return nil

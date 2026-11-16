@@ -168,6 +168,9 @@ struct BridgeWebView: UIViewRepresentable {
             case "ambient":
                 // The picture's colours, for lighting the theatre.
                 model.ambient = model.theaterOpen ? Ambient(message: body) : nil
+            case "pilot":
+                model.pilotNote = String((body["text"] as? String ?? "").prefix(200))
+                model.piloting = body["busy"] as? Bool ?? false
             case "build-note":
                 model.buildNote = String((body["text"] as? String ?? "").prefix(200))
                 model.building = body["busy"] as? Bool ?? false

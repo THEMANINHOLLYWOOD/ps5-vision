@@ -44,6 +44,10 @@ final class AppModel {
     var pulling = false
     /// The screen is showing the built-in demo, which has no picture to pull from.
     var screenIsDemo = false
+    /// The pilot (Claude, on the Mac, driving the PS5): what it last said,
+    /// and whether it is still on its way.
+    var pilotNote = ""
+    var piloting = false
     /// What building this game's controls is up to, in the page's words.
     var buildNote = ""
     var building = false

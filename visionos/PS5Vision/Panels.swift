@@ -192,3 +192,84 @@ struct PanelWebView: UIViewRepresentable {
         }
     }
 }
+
+// MARK: - Web panels
+
+/// A panel for anything on the web: a video, a stream, a guide. The PS5
+/// shows one thing at a time; this plays in the headset itself, so it is
+/// live beside the game, with its own sound.
+struct WebPanelSpec: Codable, Hashable, Identifiable {
+    var id = UUID()
+    var address = "https://m.youtube.com"
+
+    /// "twitch.tv", "https://…" or a few words to search for.
+    static func address(from typed: String) -> String? {
+        let text = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        if text.lowercased().hasPrefix("https://") { return text }
+        if text.lowercased().hasPrefix("http://") { return "https://" + text.dropFirst(7) }
+        if !text.contains(" "), text.contains(".") { return "https://" + text }
+        var search = URLComponents(string: "https://www.youtube.com/results")
+        search?.queryItems = [URLQueryItem(name: "search_query", value: text)]
+        return search?.url?.absoluteString
+    }
+}
+
+struct WebPanelView: View {
+    let spec: WebPanelSpec
+    @State private var address: String
+    @State private var typed = ""
+
+    init(spec: WebPanelSpec) {
+        self.spec = spec
+        _address = State(initialValue: spec.address)
+    }
+
+    var body: some View {
+        WebPage(address: address)
+            .background(.black)
+            .ornament(attachmentAnchor: .scene(.bottom), contentAlignment: .top) {
+                HStack(spacing: 8) {
+                    Button("YouTube") { address = "https://m.youtube.com" }
+                    Button("Twitch") { address = "https://m.twitch.tv" }
+                    TextField("An address, or what to look for", text: $typed)
+                        .textFieldStyle(.roundedBorder)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .frame(width: 340)
+                        .onSubmit {
+                            if let next = WebPanelSpec.address(from: typed) { address = next }
+                            typed = ""
+                        }
+                }
+                .padding(8)
+                .glassBackgroundEffect()
+                .padding(.top, 12)
+            }
+    }
+}
+
+/// An ordinary web view: what plays in it plays here, not on the PS5.
+struct WebPage: UIViewRepresentable {
+    let address: String
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.allowsInlineMediaPlayback = true
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.allowsBackForwardNavigationGestures = true
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        guard context.coordinator.shown != address, let url = URL(string: address) else { return }
+        context.coordinator.shown = address
+        webView.load(URLRequest(url: url))
+    }
+
+    final class Coordinator {
+        var shown: String?
+    }
+}

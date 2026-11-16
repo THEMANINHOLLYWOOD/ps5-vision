@@ -260,6 +260,7 @@ struct WebPage: UIViewRepresentable {
         configuration.allowsInlineMediaPlayback = true
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.allowsBackForwardNavigationGestures = true
+        webView.navigationDelegate = context.coordinator
         return webView
     }
 
@@ -269,7 +270,30 @@ struct WebPage: UIViewRepresentable {
         webView.load(URLRequest(url: url))
     }
 
-    final class Coordinator {
+    /// A page that can't be reached says so, instead of staying blank.
+    final class Coordinator: NSObject, WKNavigationDelegate {
         var shown: String?
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            explain(error, in: webView)
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            explain(error, in: webView)
+        }
+
+        private func explain(_ error: Error, in webView: WKWebView) {
+            let problem = error as NSError
+            // Going somewhere else before a page finished is not a failure.
+            guard problem.code != NSURLErrorCancelled, problem.code != 102 else { return }
+            let text = "Couldn't open that page: \(problem.localizedDescription)"
+                .replacingOccurrences(of: "&", with: "&amp;")
+                .replacingOccurrences(of: "<", with: "&lt;")
+            webView.loadHTMLString("""
+                <meta name="viewport" content="width=device-width">
+                <body style="background:#07090d;color:#f4f6fa;font:28px -apple-system;display:grid;place-items:center;height:100vh;margin:0;padding:0 10%;text-align:center">
+                <p>\(text)</p></body>
+                """, baseURL: nil)
+        }
     }
 }

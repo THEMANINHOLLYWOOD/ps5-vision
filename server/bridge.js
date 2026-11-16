@@ -11,6 +11,8 @@ import { wirelessDisplay } from './sharing.js';
 const RESOLUTIONS = [360, 540, 720, 1080];
 const IDLE_STOP_MS = 10_000;
 const CONNECT_TIMEOUT_MS = 30_000;
+// Extra windows on the same picture (the Vision Pro app's pulled-out panels).
+const MAX_PANELS = 4;
 const WAKE_TIMEOUT_MS = 75_000;
 const KEYFRAME_MIN_INTERVAL_MS = 700;
 // Sound arrives a hundred times a second even when the game is silent, so
@@ -91,6 +93,7 @@ export class Bridge {
 
     this.viewer = null;
     this.nextViewerId = 1;
+    this.panels = new Set();
     this.source = null;
     this.sourceOptions = null;
     this.sourceConnected = false;
@@ -164,9 +167,34 @@ export class Bridge {
     return { id: viewer.id, sdp };
   }
 
+  // A panel wants to watch too. The PS5 sends one picture, so a panel is one
+  // more window on that same picture: it gets the video the player gets, and
+  // nothing else. It can't press anything, and it neither starts the console
+  // nor keeps it awake.
+  async connectPanel() {
+    if (!this.source || !this.sourceOptions) throw Object.assign(new Error('Nothing is playing yet.'), { status: 409 });
+    if (this.panels.size >= MAX_PANELS) throw Object.assign(new Error(`No more than ${MAX_PANELS} panels at a time.`), { status: 429 });
+    const panel = new Viewer({ id: this.nextViewerId++, codec: this.sourceOptions.codec });
+    this.panels.add(panel);
+    panel.on('open', () => {
+      if (this.header) panel.setHeader(this.header);
+      if (this.sourceConnected) this.#requestKeyframe(true); // a picture can only start on one
+    });
+    panel.on('recovered', () => {
+      if (this.sourceConnected) this.#requestKeyframe(true);
+    });
+    panel.on('closed', () => this.panels.delete(panel));
+    setTimeout(() => {
+      if (!panel.ready && !panel.closed) panel.close();
+    }, CONNECT_TIMEOUT_MS).unref();
+    const sdp = await panel.createOffer();
+    return { id: panel.id, sdp };
+  }
+
   answer(id, sdp) {
-    if (!this.viewer || this.viewer.id !== id) throw Object.assign(new Error('That connection attempt is no longer current.'), { status: 409 });
-    this.viewer.acceptAnswer(sdp);
+    const viewer = this.viewer?.id === id ? this.viewer : [...this.panels].find((panel) => panel.id === id);
+    if (!viewer) throw Object.assign(new Error('That connection attempt is no longer current.'), { status: 409 });
+    viewer.acceptAnswer(sdp);
   }
 
   shutdown() {
@@ -174,6 +202,7 @@ export class Bridge {
     clearInterval(this.statsTimer);
     clearTimeout(this.idleTimer);
     this.viewer?.close();
+    for (const panel of this.panels) panel.close();
     this.source?.stop();
   }
 
@@ -300,6 +329,8 @@ export class Bridge {
   // ---------------------------------------------------------------- source
 
   async #startSource(viewer, options) {
+    // A new session may use another video format: panels come back by themselves.
+    for (const panel of this.panels) panel.close();
     const token = ++this.startToken;
     const current = () => token === this.startToken && this.viewer === viewer;
 
@@ -334,11 +365,18 @@ export class Bridge {
       // New parameter sets mean a new picture format: restart on a keyframe.
       this.viewer?.setHeader(header);
       this.viewer?.resync();
+      for (const panel of this.panels) {
+        panel.setHeader(header);
+        panel.resync();
+      }
     });
     source.on('video', (unit, tsUs) => {
       this.lastMediaAt = Date.now();
       const v = this.viewer;
       if (v && !v.pushVideo(unit, tsUs) && v.ready && v.needKeyframe) this.#requestKeyframe(false);
+      for (const panel of this.panels) {
+        if (!panel.pushVideo(unit, tsUs) && panel.ready && panel.needKeyframe) this.#requestKeyframe(false);
+      }
     });
     source.on('audio', (packet, tsUs) => {
       this.lastMediaAt = Date.now();
@@ -393,6 +431,7 @@ export class Bridge {
         // or a viewer on a weak connection). The picture restarts from a
         // keyframe; ask the console for one.
         this.viewer?.resync();
+        for (const panel of this.panels) panel.resync();
         this.#requestKeyframe(true);
         break;
       case 'login_pin_request':

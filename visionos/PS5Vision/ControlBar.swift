@@ -34,6 +34,10 @@ struct ControlBar: View {
                 Toggle(isOn: Binding(get: { model.buttonsShown }, set: { model.buttonsChosen = $0 })) {
                     Label("Buttons", systemImage: "circle.grid.2x2.fill")
                 }
+                Toggle(isOn: Binding(get: { model.pulling }, set: { model.pulling = $0 })) {
+                    Label("Pull out", systemImage: "rectangle.on.rectangle")
+                }
+                .disabled(model.screenIsDemo)
                 Button {
                     model.controller.sink?("window.ps5BuildForGame&&ps5BuildForGame()")
                 } label: {
@@ -163,7 +167,7 @@ private struct GameButton: View {
         VStack(spacing: 1) {
             Text(model.controls.label(for: target))
                 .font(.headline)
-            if model.controls.labels[target] != nil {
+            if let label = model.controls.labels[target], label.lowercased() != target.name.lowercased() {
                 Text(target.name)
                     .font(.caption2)
                     .foregroundStyle(.secondary)

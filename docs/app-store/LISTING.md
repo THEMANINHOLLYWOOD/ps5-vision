@@ -36,6 +36,7 @@ Show the app where your console is once. From then on a Connect button floats ab
 • A screen any size. From a desk monitor to a cinema wall, always 16:9.
 • Your controller, all of it. Every button, both sticks, both triggers and rumble, read directly from the controller paired with your headset.
 • Immersive. The room goes dark and the game lights it: the picture's colours glow from behind the screen and move with it.
+• Panels. Pull any part of the picture out into a window of its own: the map beside you, the scoreboard overhead.
 • Or no controller at all. Pinch and move a hand for a stick, touch thumb to finger for a button. The controls are worked out for the game you are playing, with its own actions named under the screen.
 • Sharp and quick. Up to 1080p at 60 pictures a second over your home Wi-Fi.
 • Private. No account, no tracking, nothing leaves your home network.

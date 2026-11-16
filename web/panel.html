@@ -1,0 +1,28 @@
+<!doctype html>
+<!-- One more window on the picture that is already playing: the whole of it,
+     or one part (a map, a scoreboard, a video). It only watches. The Vision
+     Pro app opens one of these for every panel pulled out of the screen. -->
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #view { position: fixed; inset: 0; overflow: hidden; }
+  /* Stretched over the part asked for; the window has that part's shape. */
+  video { position: absolute; display: block; object-fit: fill; }
+  #note {
+    position: fixed; inset: 0; display: grid; place-items: center; text-align: center; padding: 0 8%;
+    color: #aab3c8; font: 500 4.2vw -apple-system, system-ui, sans-serif;
+  }
+  #held {
+    position: fixed; top: 3vh; right: 3vw; padding: .5vw 1.6vw; border-radius: 999px;
+    background: rgba(0, 0, 0, .55); color: #fff; font: 600 3vw -apple-system, system-ui, sans-serif;
+  }
+  [hidden] { display: none !important; }
+</style>
+<div id="view"><video id="screen" autoplay muted playsinline></video></div>
+<div id="note">Connecting…</div>
+<div id="held" hidden>Held</div>
+<script type="module" src="panel.js"></script>
+</html>

@@ -35,6 +35,8 @@ const STATIC_FILES = {
   '/style.css': ['style.css', 'text/css; charset=utf-8'],
   '/capture.html': ['capture.html', 'text/html; charset=utf-8'],
   '/capture.js': ['capture.js', 'text/javascript; charset=utf-8'],
+  '/panel.html': ['panel.html', 'text/html; charset=utf-8'],
+  '/panel.js': ['panel.js', 'text/javascript; charset=utf-8'],
 };
 const MAX_BODY = 256 * 1024;
 
@@ -181,7 +183,8 @@ function createHandler(bridge, info, log) {
           return;
         }
         const body = await readJson(req);
-        sendJson(res, 200, await bridge.connect(body));
+        // { panel: true }: one more window on the picture already playing.
+        sendJson(res, 200, body?.panel === true ? await bridge.connectPanel() : await bridge.connect(body));
         return;
       }
       if (req.method === 'POST' && url.pathname === '/api/answer') {

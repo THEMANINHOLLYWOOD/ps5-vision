@@ -11,6 +11,7 @@ import { nextAudioSamples } from './viewer.js';
 import { BUTTON, encodeState, idleState, readGamepad, statesEqual } from '../web/controller.js';
 import { BUTTON_TARGETS, HAND_GESTURES, KEY_GUIDE, KEY_MAP, LAYOUTS, TARGETS, compileLayout, findLayout, guideFor, isMappedKey, keyboardState, mergeStates, mouseToStick, sanitizeLayout, sanitizeVision, unreachable } from '../web/keyboard.js';
 import { LayoutStore, buildLayout, cleanGameName, findClaude, layoutRequest } from './layouts.js';
+import { readCrop } from '../web/panel.js';
 import { wirelessDisplayIn } from './sharing.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -666,4 +667,15 @@ test('H.265 keyframes and parameter sets are told from ordinary pictures', () =>
   assert.ok(!hasParameterSets(key, true));
   // Read as H.264, the same bytes mean something else: the flag matters.
   assert.ok(!isKeyframe(key, false));
+});
+
+// ------------------------------------------------------------------ panels
+
+test('a panel shows the part of the picture asked for, or all of it', () => {
+  assert.deepEqual(readCrop('?crop=0.5,0.25,0.5,0.5'), { x: 0.5, y: 0.25, width: 0.5, height: 0.5 });
+  assert.deepEqual(readCrop(''), { x: 0, y: 0, width: 1, height: 1 });
+  // Never outside the picture, whatever the address says.
+  assert.deepEqual(readCrop('?crop=0.9,0.9,0.5,2'), { x: 0.5, y: 0, width: 0.5, height: 1 });
+  assert.deepEqual(readCrop('?crop=a,b,c,d'), { x: 0, y: 0, width: 1, height: 1 });
+  assert.equal(readCrop('?crop=0,0,0,0').width, 0.02);
 });

@@ -40,6 +40,10 @@ final class AppModel {
     var ambient: Ambient?
     /// Where the screen's window is inside the theatre.
     var screenCorners: ScreenCorners?
+    /// A panel is being pulled out: the next drag over the screen picks its part.
+    var pulling = false
+    /// The screen is showing the built-in demo, which has no picture to pull from.
+    var screenIsDemo = false
     /// What building this game's controls is up to, in the page's words.
     var buildNote = ""
     var building = false

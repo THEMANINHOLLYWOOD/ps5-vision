@@ -10,6 +10,7 @@
 		038B633AEE367D034F3F653C /* LauncherView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A57165E841B18B7471E1536 /* LauncherView.swift */; };
 		2FD4294A846CB8257E0DAA57 /* Bridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10C6B7B6F58406F4C3DBA25 /* Bridge.swift */; };
 		35D9CB52ED6A1541B49885D8 /* TheaterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C1AF5D37221B71A3C568EC /* TheaterView.swift */; };
+		47E1089A8E6D2073D38573E9 /* Panels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B5C0791291F47E3845CBA42 /* Panels.swift */; };
 		4C3CFD7BC65D9D5F2D574DF0 /* VisionControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5DD02B8AB19D84FEABD0F33 /* VisionControls.swift */; };
 		4FCB08B7537C90CE5FECB3EF /* PS5VisionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF96C03F0472B11FBD6619CD /* PS5VisionApp.swift */; };
 		522D7B30FD45F559C7B3AAC9 /* ConsoleSpot.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF87BE522F0FD7BBB06615B1 /* ConsoleSpot.swift */; };
@@ -27,6 +28,7 @@
 /* Begin PBXFileReference section */
 		07A153AA5203886523905E9F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		1913727A8BFA8B20BBFA50C5 /* ScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenView.swift; sourceTree = "<group>"; };
+		3B5C0791291F47E3845CBA42 /* Panels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels.swift; sourceTree = "<group>"; };
 		4A57165E841B18B7471E1536 /* LauncherView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherView.swift; sourceTree = "<group>"; };
 		4A6C3DDC9AA85B8FB939C372 /* ControlBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlBar.swift; sourceTree = "<group>"; };
 		55F42268EF2F00F4C953C0B2 /* Demo.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = Demo.html; sourceTree = "<group>"; };
@@ -58,6 +60,7 @@
 				7483E8EC83A1E5AB39FBFB69 /* Info.plist */,
 				4A57165E841B18B7471E1536 /* LauncherView.swift */,
 				671B3DAB99D062349AF14089 /* NativeController.swift */,
+				3B5C0791291F47E3845CBA42 /* Panels.swift */,
 				07A153AA5203886523905E9F /* PrivacyInfo.xcprivacy */,
 				EF96C03F0472B11FBD6619CD /* PS5VisionApp.swift */,
 				7235B6AF8B261A5E0843216E /* RoomView.swift */,
@@ -165,6 +168,7 @@
 				038B633AEE367D034F3F653C /* LauncherView.swift in Sources */,
 				C2487602DB706DF06E55E649 /* NativeController.swift in Sources */,
 				4FCB08B7537C90CE5FECB3EF /* PS5VisionApp.swift in Sources */,
+				47E1089A8E6D2073D38573E9 /* Panels.swift in Sources */,
 				C8EA8955818205136D198E10 /* RoomView.swift in Sources */,
 				7D5E99612F6A9BA16179DCAB /* ScreenView.swift in Sources */,
 				35D9CB52ED6A1541B49885D8 /* TheaterView.swift in Sources */,

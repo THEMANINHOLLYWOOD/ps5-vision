@@ -65,7 +65,7 @@ struct LauncherView: View {
                  : "Show the app where your PS5 is once. After that, a Connect button appears over it whenever you look at it.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
-            Text("Under the screen: Immersive darkens the room and lights it with the game. Hands lets you play with no controller, with controls made for the game on screen.")
+            Text("Under the screen: Immersive darkens the room and lights it with the game. Hands lets you play with no controller, with controls made for the game on screen. Pull out puts the picture, or any part of it, in a panel of its own.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
@@ -121,6 +121,13 @@ struct LauncherView: View {
             if let bridge = model.bridge, !model.screenOpen { openWindow(id: "screen", value: bridge) }
         case "demo":
             if !model.screenOpen { openWindow(id: "screen", value: Bridge.demo) }
+        case "panel":
+            // The screen, and once it is playing, its middle as a panel.
+            for _ in 0..<50 where model.bridge == nil { try? await Task.sleep(for: .milliseconds(100)) }
+            guard let bridge = model.bridge else { break }
+            if !model.screenOpen { openWindow(id: "screen", value: bridge) }
+            try? await Task.sleep(for: .seconds(25))
+            openWindow(id: "panel", value: PanelSpec(bridge: bridge, x: 0.25, y: 0.25, width: 0.5, height: 0.5))
         case "theater":
             // The screen (the demo when there is no bridge), then the dark around it.
             for _ in 0..<50 where model.bridge == nil { try? await Task.sleep(for: .milliseconds(100)) }

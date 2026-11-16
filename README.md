@@ -218,6 +218,12 @@ the same stream, and adds what a web page can't:
   pinch thumb and index finger and move that hand, and it is a stick; touch the
   thumb to another finger, and it is a button. A guide under the screen shows
   what each gesture does and lights up as you do it.
+- **Panels.** **Pull out**, then drag over any part of the picture (a map, a
+  scoreboard, a video) or pinch once for all of it, and that part becomes a
+  panel of its own to put anywhere, at any size. **Hold this picture** makes a
+  panel keep what it was showing while the game goes on. The PS5 sends one
+  picture, so panels are windows on that picture: two things can't run live
+  side by side.
 - **Controls made for the game.** **Build for this game** has Claude (on your
   Mac, as for the keyboard) decide which gesture does what in the game on
   screen: in a shooter the right middle finger fires and the left one aims.

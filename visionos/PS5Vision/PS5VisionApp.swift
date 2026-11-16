@@ -21,6 +21,15 @@ struct PS5VisionApp: App {
         }
         .defaultSize(width: ScreenSize.standard.size.width, height: ScreenSize.standard.size.height)
 
+        // Panels pulled out of the screen: the picture, or a part of it, each
+        // in a window of its own.
+        WindowGroup(id: "panel", for: PanelSpec.self) { $spec in
+            if let spec {
+                PanelView(spec: spec)
+            }
+        }
+        .defaultSize(width: 900, height: 506)
+
         // The room exactly as it looks, plus a Connect button over the PS5.
         ImmersiveSpace(id: "room") {
             RoomView()

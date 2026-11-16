@@ -11,12 +11,15 @@ struct ScreenView: View {
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
 
     var body: some View {
-        BridgeWebView(bridge: bridge, model: model)
+        ZStack {
+            BridgeWebView(bridge: bridge, model: model)
+                // While hands are the controller a pinch is a stick or a
+                // button, not a tap on whatever the eyes happen to be on.
+                .allowsHitTesting(!(model.handsOn && model.theaterOpen))
+            if model.pulling { PullOutOverlay(bridge: bridge) }
+        }
             .aspectRatio(16 / 9, contentMode: .fit)
             .background(.black)
-            // While hands are the controller a pinch is a stick or a button,
-            // not a tap on whatever the eyes happen to be on.
-            .allowsHitTesting(!(model.handsOn && model.theaterOpen))
             // Where this window is inside the theatre, so the glow can sit
             // right behind it. (No answer while no immersive space is open.)
             .onGeometryChange3D(for: ScreenCorners?.self) { proxy -> ScreenCorners? in
@@ -47,9 +50,13 @@ struct ScreenView: View {
                     try? await Task.sleep(for: .seconds(3))
                 }
             }
-            .onAppear { model.screenOpen = true }
+            .onAppear {
+                model.screenOpen = true
+                model.screenIsDemo = bridge.isDemo
+            }
             .onDisappear {
                 model.screenOpen = false
+                model.pulling = false
                 model.screenCorners = nil
                 // A theatre with no screen in it is just a dark room.
                 if model.theaterOpen { Task { await dismissImmersiveSpace() } }

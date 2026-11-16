@@ -123,6 +123,7 @@ struct LauncherView: View {
             if !model.screenOpen { openWindow(id: "screen", value: Bridge.demo) }
         case "theater":
             // The screen (the demo when there is no bridge), then the dark around it.
+            for _ in 0..<50 where model.bridge == nil { try? await Task.sleep(for: .milliseconds(100)) }
             if !model.screenOpen { openWindow(id: "screen", value: model.bridge ?? Bridge.demo) }
             try? await Task.sleep(for: .seconds(2))
             if model.roomOpen {

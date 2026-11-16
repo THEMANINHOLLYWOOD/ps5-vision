@@ -72,7 +72,7 @@ final class Glow {
             return
         }
         // Barely there: enough that the dark is the game's dark.
-        dome.model?.materials = [UnlitMaterial(color: Self.colour(ambient.all, brightness: 0.07))]
+        dome.model?.materials = [UnlitMaterial(color: Self.colour(ambient.all, brightness: 0.05))]
 
         guard let screen else {
             halo.isEnabled = false
@@ -97,11 +97,11 @@ final class Glow {
 
         // (colour, where on the screen it sits, how big, how strong)
         let pools: [(SIMD3<Float>, SIMD2<Float>, SIMD2<Float>, Float)] = [
-            (ambient.all, [0, 0], [width * 2.3, height * 2.6], 0.55),
-            (ambient.top, [0, height * 0.5], [width * 1.7, height * 1.5], 0.8),
-            (ambient.bottom, [0, -height * 0.5], [width * 1.7, height * 1.5], 0.8),
-            (ambient.left, [-width * 0.5, 0], [width * 1.1, height * 1.9], 0.8),
-            (ambient.right, [width * 0.5, 0], [width * 1.1, height * 1.9], 0.8),
+            (ambient.all, [0, 0], [width * 2.0, height * 2.3], 0.3),
+            (ambient.top, [0, height * 0.5], [width * 1.6, height * 1.3], 0.5),
+            (ambient.bottom, [0, -height * 0.5], [width * 1.6, height * 1.3], 0.5),
+            (ambient.left, [-width * 0.5, 0], [width * 1.0, height * 1.7], 0.5),
+            (ambient.right, [width * 0.5, 0], [width * 1.0, height * 1.7], 0.5),
         ]
         for (index, (blob, pool)) in zip(blobs, pools).enumerated() {
             // Behind the screen, each a little further back so they don't fight.
@@ -124,8 +124,8 @@ final class Glow {
         let peak = max(rgb.x, rgb.y, rgb.z)
         guard peak > 0.02 else { return .black } // a black screen throws no light
         let mean = (rgb.x + rgb.y + rgb.z) / 3
-        let vivid = simd_clamp(mean + (rgb - mean) * 1.5, SIMD3(repeating: 0), SIMD3(repeating: 1))
-        let lifted = vivid / max(vivid.x, vivid.y, vivid.z, 0.001) * min(1, 0.25 + peak * 1.1)
+        let vivid = simd_clamp(mean + (rgb - mean) * 1.25, SIMD3(repeating: 0), SIMD3(repeating: 1))
+        let lifted = vivid / max(vivid.x, vivid.y, vivid.z, 0.001) * min(0.85, 0.1 + peak)
         let out = lifted * brightness
         return UIColor(red: CGFloat(out.x), green: CGFloat(out.y), blue: CGFloat(out.z), alpha: 1)
     }

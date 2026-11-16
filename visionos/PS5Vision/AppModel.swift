@@ -65,7 +65,7 @@ final class AppModel {
 
     init() {
         handsOn = UserDefaults.standard.bool(forKey: "hands-on")
-        buttonsChosen = UserDefaults.standard.object(forKey: "buttons-shown") as? Bool
+        buttonsChosen = UserDefaults.standard.object(forKey: "buttons-shown") == nil ? nil : UserDefaults.standard.bool(forKey: "buttons-shown")
         spotSaved = UserDefaults.standard.bool(forKey: "spot-saved")
         if let data = UserDefaults.standard.data(forKey: "typed-bridge") {
             typedBridge = try? JSONDecoder().decode(Bridge.self, from: data)

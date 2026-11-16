@@ -183,7 +183,14 @@ export class Bridge {
     panel.on('recovered', () => {
       if (this.sourceConnected) this.#requestKeyframe(true);
     });
+    // All a panel may ask for: its picture again, when it can't draw what it got.
+    panel.on('control', (message) => {
+      if (message.type !== 'keyframe') return;
+      panel.resync();
+      this.#requestKeyframe(false);
+    });
     panel.on('closed', () => this.panels.delete(panel));
+    panel.on('state', (state) => this.log(`panel ${panel.id}: ${state}`));
     setTimeout(() => {
       if (!panel.ready && !panel.closed) panel.close();
     }, CONNECT_TIMEOUT_MS).unref();

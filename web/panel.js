@@ -57,6 +57,35 @@ if (video) {
   };
 
   const kept = []; // channels nobody holds on to are closed
+  let control = null;
+
+  // A picture can only start on a keyframe. If video is arriving and none of
+  // it can be drawn (the keyframe was lost on the way, or this panel joined
+  // just after one), ask the Mac for another.
+  let before = null;
+  let stuck = 0;
+  setInterval(async () => {
+    if (!pc || pc.connectionState !== 'connected') {
+      before = null;
+      return;
+    }
+    let now = null;
+    try {
+      for (const report of (await pc.getStats()).values()) {
+        if (report.type === 'inbound-rtp' && report.kind === 'video') now = report;
+      }
+    } catch { /* closing */ }
+    if (!now) return;
+    const arriving = (now.bytesReceived ?? 0) > (before?.bytesReceived ?? 0);
+    const drawn = (now.framesDecoded ?? 0) > (before?.framesDecoded ?? 0);
+    const asked = (now.pliCount ?? 0) > (before?.pliCount ?? 0);
+    stuck = before && arriving && !drawn ? stuck + 1 : 0;
+    before = now;
+    if ((stuck >= 2 || asked) && control?.readyState === 'open') {
+      stuck = 0;
+      control.send(JSON.stringify({ type: 'keyframe' }));
+    }
+  }, 1000);
   async function connect() {
     let offer;
     try {
@@ -67,7 +96,10 @@ if (video) {
     }
     const connection = new RTCPeerConnection();
     pc = connection;
-    connection.addEventListener('datachannel', (event) => kept.push(event.channel));
+    connection.addEventListener('datachannel', (event) => {
+      kept.push(event.channel);
+      if (event.channel.label === 'control') control = event.channel;
+    });
     connection.addEventListener('track', (event) => {
       if (event.track.kind !== 'video') return;
       // As little delay as the browser will allow: this is a live picture.

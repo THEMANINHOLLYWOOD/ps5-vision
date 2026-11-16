@@ -9,10 +9,14 @@
 /* Begin PBXBuildFile section */
 		038B633AEE367D034F3F653C /* LauncherView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A57165E841B18B7471E1536 /* LauncherView.swift */; };
 		2FD4294A846CB8257E0DAA57 /* Bridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10C6B7B6F58406F4C3DBA25 /* Bridge.swift */; };
+		35D9CB52ED6A1541B49885D8 /* TheaterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C1AF5D37221B71A3C568EC /* TheaterView.swift */; };
+		4C3CFD7BC65D9D5F2D574DF0 /* VisionControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5DD02B8AB19D84FEABD0F33 /* VisionControls.swift */; };
 		4FCB08B7537C90CE5FECB3EF /* PS5VisionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF96C03F0472B11FBD6619CD /* PS5VisionApp.swift */; };
 		522D7B30FD45F559C7B3AAC9 /* ConsoleSpot.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF87BE522F0FD7BBB06615B1 /* ConsoleSpot.swift */; };
 		55D6094C0CBFC770A4FBBB14 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 07A153AA5203886523905E9F /* PrivacyInfo.xcprivacy */; };
+		6901C8CC9D95C87126F03D4F /* HandControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3B00296038092B2E9C1B0B /* HandControls.swift */; };
 		7D5E99612F6A9BA16179DCAB /* ScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1913727A8BFA8B20BBFA50C5 /* ScreenView.swift */; };
+		925936DD49FC8ACEEF4C8874 /* ControlBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6C3DDC9AA85B8FB939C372 /* ControlBar.swift */; };
 		BFB2E85E6DCBB053012BAB5F /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E194D8320ACDB6BF794C59A /* AppModel.swift */; };
 		C2487602DB706DF06E55E649 /* NativeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 671B3DAB99D062349AF14089 /* NativeController.swift */; };
 		C8EA8955818205136D198E10 /* RoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7235B6AF8B261A5E0843216E /* RoomView.swift */; };
@@ -24,6 +28,7 @@
 		07A153AA5203886523905E9F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		1913727A8BFA8B20BBFA50C5 /* ScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenView.swift; sourceTree = "<group>"; };
 		4A57165E841B18B7471E1536 /* LauncherView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherView.swift; sourceTree = "<group>"; };
+		4A6C3DDC9AA85B8FB939C372 /* ControlBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlBar.swift; sourceTree = "<group>"; };
 		55F42268EF2F00F4C953C0B2 /* Demo.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = Demo.html; sourceTree = "<group>"; };
 		671B3DAB99D062349AF14089 /* NativeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeController.swift; sourceTree = "<group>"; };
 		7235B6AF8B261A5E0843216E /* RoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomView.swift; sourceTree = "<group>"; };
@@ -32,6 +37,9 @@
 		7E194D8320ACDB6BF794C59A /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		B812C021F2281FD5E49EDF25 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C10C6B7B6F58406F4C3DBA25 /* Bridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bridge.swift; sourceTree = "<group>"; };
+		C5DD02B8AB19D84FEABD0F33 /* VisionControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionControls.swift; sourceTree = "<group>"; };
+		D6C1AF5D37221B71A3C568EC /* TheaterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheaterView.swift; sourceTree = "<group>"; };
+		DC3B00296038092B2E9C1B0B /* HandControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandControls.swift; sourceTree = "<group>"; };
 		DF87BE522F0FD7BBB06615B1 /* ConsoleSpot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsoleSpot.swift; sourceTree = "<group>"; };
 		EF96C03F0472B11FBD6619CD /* PS5VisionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PS5VisionApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -44,7 +52,9 @@
 				B812C021F2281FD5E49EDF25 /* Assets.xcassets */,
 				C10C6B7B6F58406F4C3DBA25 /* Bridge.swift */,
 				DF87BE522F0FD7BBB06615B1 /* ConsoleSpot.swift */,
+				4A6C3DDC9AA85B8FB939C372 /* ControlBar.swift */,
 				55F42268EF2F00F4C953C0B2 /* Demo.html */,
+				DC3B00296038092B2E9C1B0B /* HandControls.swift */,
 				7483E8EC83A1E5AB39FBFB69 /* Info.plist */,
 				4A57165E841B18B7471E1536 /* LauncherView.swift */,
 				671B3DAB99D062349AF14089 /* NativeController.swift */,
@@ -52,6 +62,8 @@
 				EF96C03F0472B11FBD6619CD /* PS5VisionApp.swift */,
 				7235B6AF8B261A5E0843216E /* RoomView.swift */,
 				1913727A8BFA8B20BBFA50C5 /* ScreenView.swift */,
+				D6C1AF5D37221B71A3C568EC /* TheaterView.swift */,
+				C5DD02B8AB19D84FEABD0F33 /* VisionControls.swift */,
 			);
 			path = PS5Vision;
 			sourceTree = "<group>";
@@ -148,11 +160,15 @@
 				BFB2E85E6DCBB053012BAB5F /* AppModel.swift in Sources */,
 				2FD4294A846CB8257E0DAA57 /* Bridge.swift in Sources */,
 				522D7B30FD45F559C7B3AAC9 /* ConsoleSpot.swift in Sources */,
+				925936DD49FC8ACEEF4C8874 /* ControlBar.swift in Sources */,
+				6901C8CC9D95C87126F03D4F /* HandControls.swift in Sources */,
 				038B633AEE367D034F3F653C /* LauncherView.swift in Sources */,
 				C2487602DB706DF06E55E649 /* NativeController.swift in Sources */,
 				4FCB08B7537C90CE5FECB3EF /* PS5VisionApp.swift in Sources */,
 				C8EA8955818205136D198E10 /* RoomView.swift in Sources */,
 				7D5E99612F6A9BA16179DCAB /* ScreenView.swift in Sources */,
+				35D9CB52ED6A1541B49885D8 /* TheaterView.swift in Sources */,
+				4C3CFD7BC65D9D5F2D574DF0 /* VisionControls.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

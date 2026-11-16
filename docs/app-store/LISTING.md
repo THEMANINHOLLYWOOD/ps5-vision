@@ -35,6 +35,8 @@ Show the app where your console is once. From then on a Connect button floats ab
 • Look to connect. No menus: look at your console and pinch.
 • A screen any size. From a desk monitor to a cinema wall, always 16:9.
 • Your controller, all of it. Every button, both sticks, both triggers and rumble, read directly from the controller paired with your headset.
+• Immersive. The room goes dark and the game lights it: the picture's colours glow from behind the screen and move with it.
+• Or no controller at all. Pinch and move a hand for a stick, touch thumb to finger for a button. The controls are worked out for the game you are playing, with its own actions named under the screen.
 • Sharp and quick. Up to 1080p at 60 pictures a second over your home Wi-Fi.
 • Private. No account, no tracking, nothing leaves your home network.
 • Try it first. A built-in demo shows the screen and your controller with nothing else set up.
@@ -102,6 +104,15 @@ Paste this into **App Review Information → Notes**:
 > with Bonjour (_ps5vision._tcp), which is why it asks for Local Network
 > access. World Sensing is used only to keep a world anchor at the console's
 > position. No login is needed to review the app.
+>
+> IMMERSIVE AND HANDS: under the screen, "Immersive" opens a full immersive
+> space: the surroundings go dark and are lit in the picture's colours. "Hands"
+> (which asks for Hand Tracking) turns hand poses into controller input: pinch
+> thumb and index finger and move the hand for a stick, touch the thumb to the
+> middle or ring finger for a button. Both work in the demo: with Hands on,
+> pinch and move your left hand to steer, and touch right thumb to right middle
+> finger for a pulse. Hand data is used on the device only to produce those
+> button presses.
 >
 > The app is not affiliated with Sony. "PS5" is used only to say which console
 > it works with.

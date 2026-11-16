@@ -2,7 +2,7 @@
 // WebRTC and sends controller input back.
 
 import { BUTTON, encodeState, idleState, readGamepad, statesEqual } from './controller.js';
-import { LAYOUTS, compileLayout, findLayout, guideFor, isMappedKey, keyboardState, mergeStates, mouseToStick } from './keyboard.js';
+import { LAYOUTS, compileLayout, findLayout, guideFor, isMappedKey, keyboardState, mergeStates, mouseToStick, sanitizeVision } from './keyboard.js';
 
 const $ = (id) => document.getElementById(id);
 const video = $('screen');
@@ -863,6 +863,20 @@ function useLayout(id, { remember = true } = {}) {
   $('layout-about').textContent = layout.about;
   $('mouse-row').hidden = !layout.mouseLook;
   fillKeyGuide();
+  tellAppTheControls();
+}
+
+// The Vision Pro app plays the same layout with bare hands: which gesture
+// presses what, and which buttons float under the screen.
+function tellAppTheControls() {
+  nativeBridge()?.postMessage({
+    type: 'controls',
+    id: layout.id,
+    name: layout.name,
+    built: Boolean(layout.built),
+    labels: layout.labels ?? {},
+    vision: layout.vision ?? sanitizeVision(null, layout.labels ?? {}),
+  });
 }
 
 function savedLayoutId() {
@@ -908,6 +922,7 @@ async function buildForGame() {
   const note = (text) => {
     $('build-note').textContent = text;
     $('build-note').hidden = !text;
+    nativeBridge()?.postMessage({ type: 'build-note', text, busy: $('btn-build').disabled });
   };
   const name = $('game-name').value.trim();
   const image = name ? null : screenPicture();
@@ -932,8 +947,86 @@ async function buildForGame() {
     note(err.message);
   } finally {
     $('btn-build').disabled = false;
+    nativeBridge()?.postMessage({ type: 'build-note', text: $('build-note').textContent, busy: false });
   }
 }
+// The app's own "Build for this game" button, next to its hand controls.
+window.ps5BuildForGame = () => {
+  if (!$('btn-build').disabled) buildForGame();
+};
+
+// ---------------------------------------------------------------- ambience
+//
+// In the app's immersive theatre the room is lit by the game: a few times a
+// second, the colours along each edge of the picture go to the app, which
+// glows them around the screen.
+const AMBIENT_EVERY_MS = 110;
+const AMBIENT_W = 16;
+const AMBIENT_H = 9;
+let ambientTimer = null;
+let ambientCanvas = null;
+let ambientLast = null;
+
+function ambientColours() {
+  if (!streaming || !video.videoWidth) return null;
+  ambientCanvas ??= Object.assign(document.createElement('canvas'), { width: AMBIENT_W, height: AMBIENT_H });
+  const context = ambientCanvas.getContext('2d', { willReadFrequently: true });
+  let pixels;
+  try {
+    context.drawImage(video, 0, 0, AMBIENT_W, AMBIENT_H);
+    pixels = context.getImageData(0, 0, AMBIENT_W, AMBIENT_H).data;
+  } catch {
+    return null;
+  }
+  // The average of a block of the small picture, as [r, g, b].
+  const average = (x0, y0, x1, y1) => {
+    const sum = [0, 0, 0];
+    for (let y = y0; y < y1; y += 1) {
+      for (let x = x0; x < x1; x += 1) {
+        const at = (y * AMBIENT_W + x) * 4;
+        sum[0] += pixels[at]; sum[1] += pixels[at + 1]; sum[2] += pixels[at + 2];
+      }
+    }
+    const count = (x1 - x0) * (y1 - y0);
+    return sum.map((value) => value / count);
+  };
+  return {
+    all: average(0, 0, AMBIENT_W, AMBIENT_H),
+    top: average(0, 0, AMBIENT_W, 3),
+    bottom: average(0, AMBIENT_H - 3, AMBIENT_W, AMBIENT_H),
+    left: average(0, 0, 4, AMBIENT_H),
+    right: average(AMBIENT_W - 4, 0, AMBIENT_W, AMBIENT_H),
+  };
+}
+
+function sendAmbient() {
+  const now = ambientColours();
+  if (!now) {
+    if (ambientLast) nativeBridge()?.postMessage({ type: 'ambient', off: true });
+    ambientLast = null;
+    return;
+  }
+  // Eased, so a flash on screen is a swell in the room, not a flicker.
+  for (const side of Object.keys(now)) {
+    const before = ambientLast?.[side] ?? now[side];
+    now[side] = now[side].map((value, i) => before[i] + (value - before[i]) * 0.35);
+  }
+  ambientLast = now;
+  const message = { type: 'ambient' };
+  for (const side of Object.keys(now)) message[side] = now[side].map((value) => Math.round(value));
+  nativeBridge()?.postMessage(message);
+}
+
+window.ps5SetAmbient = (on) => {
+  if (Boolean(on) === Boolean(ambientTimer)) return;
+  if (on) {
+    ambientTimer = setInterval(sendAmbient, AMBIENT_EVERY_MS);
+  } else {
+    clearInterval(ambientTimer);
+    ambientTimer = null;
+    ambientLast = null;
+  }
+};
 
 // A key or mouse button going down and up, and one that is only tapped
 // (a click, one notch of the wheel): held for a moment so it isn't missed.

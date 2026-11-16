@@ -65,6 +65,9 @@ struct LauncherView: View {
                  : "Show the app where your PS5 is once. After that, a Connect button appears over it whenever you look at it.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+            Text("Under the screen: Immersive darkens the room and lights it with the game. Hands lets you play with no controller, with controls made for the game on screen.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
 
             DisclosureGroup("Bridge address") {
                 VStack(alignment: .leading, spacing: 10) {
@@ -103,7 +106,8 @@ struct LauncherView: View {
         }
         // ps5vision://connect opens the screen (handy from Shortcuts),
         // ps5vision://room looks for the PS5, ps5vision://place moves its spot,
-        // ps5vision://demo opens the built-in demo.
+        // ps5vision://demo opens the built-in demo, ps5vision://theater the
+        // screen with the immersive theatre around it.
         .onOpenURL { url in
             Task { await follow(url) }
         }
@@ -117,6 +121,15 @@ struct LauncherView: View {
             if let bridge = model.bridge, !model.screenOpen { openWindow(id: "screen", value: bridge) }
         case "demo":
             if !model.screenOpen { openWindow(id: "screen", value: Bridge.demo) }
+        case "theater":
+            // The screen (the demo when there is no bridge), then the dark around it.
+            if !model.screenOpen { openWindow(id: "screen", value: model.bridge ?? Bridge.demo) }
+            try? await Task.sleep(for: .seconds(2))
+            if model.roomOpen {
+                await dismissImmersiveSpace()
+                try? await Task.sleep(for: .milliseconds(400))
+            }
+            _ = await openImmersiveSpace(id: "theater")
         case "room":
             await setRoom(open: true)
         case "place":
@@ -148,7 +161,7 @@ struct LauncherView: View {
     }
 
     private func setRoom(open: Bool) async {
-        if open, !model.roomOpen {
+        if open, !model.roomOpen, !model.theaterOpen { // one immersive space at a time
             _ = await openImmersiveSpace(id: "room")
         } else if !open, model.roomOpen {
             model.placingSpot = false

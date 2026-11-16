@@ -211,6 +211,19 @@ the same stream, and adds what a web page can't:
   button works and rumble reaches your hands.
 - **No address or certificate warning.** It finds the bridge on your network
   by itself and trusts only that bridge's own certificate.
+- **Immersive.** Under the screen, **Immersive** turns the room dark and lights
+  it with the game: the picture's own colours glow out from behind the screen
+  and follow it as it changes.
+- **Hands as the controller.** With **Hands** on, no controller is needed:
+  pinch thumb and index finger and move that hand, and it is a stick; touch the
+  thumb to another finger, and it is a button. A guide under the screen shows
+  what each gesture does and lights up as you do it.
+- **Controls made for the game.** **Build for this game** has Claude (on your
+  Mac, as for the keyboard) decide which gesture does what in the game on
+  screen: in a shooter the right middle finger fires and the left one aims.
+  The actions that can wait half a second (reload, map, pause) float under the
+  screen as named buttons to look at and pinch, and every other button of the
+  controller is under the dots next to them.
 
 To put it on your headset you need a Mac with Xcode and a free Apple account.
 Once:

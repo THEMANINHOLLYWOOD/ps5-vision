@@ -168,6 +168,57 @@ export function layoutId(game) {
   return `game:${slug || 'unknown'}`;
 }
 
+// ---------------------------------------------------------------- bare hands
+//
+// In the Vision Pro app a game can be played with no controller at all:
+// pinch thumb and index finger and move that hand, and it is a stick; touch
+// the thumb to another finger, and it is a button, held for as long as they
+// touch. Whatever doesn't fit on the hands floats under the screen as buttons
+// to look at and pinch.
+
+// Thumb to middle, ring and little finger of each hand, easiest first.
+export const HAND_GESTURES = Object.freeze(['rightMiddle', 'leftMiddle', 'rightRing', 'leftRing', 'rightLittle', 'leftLittle']);
+// What pinching thumb and index finger and moving the hand can be.
+export const HAND_DRAGS = Object.freeze(['LS', 'RS', 'DPAD', 'NONE']);
+// Everything on the controller that is pressed rather than pushed around.
+export const BUTTON_TARGETS = Object.freeze(Object.keys(TARGETS).filter((target) => !/^[LR]S_/.test(target)));
+const PANEL_MAX = 8;
+const USUAL_GESTURES = Object.freeze({
+  rightMiddle: 'CROSS', leftMiddle: 'SQUARE', rightRing: 'R2', leftRing: 'L2', rightLittle: 'CIRCLE', leftLittle: 'TRIANGLE',
+});
+const USUAL_PANEL = Object.freeze(['TRIANGLE', 'CIRCLE', 'SQUARE', 'CROSS', 'R1', 'L1', 'OPTIONS', 'TOUCHPAD', 'R2', 'L2', 'CREATE']);
+
+// Hand controls as the app will use them, whatever was sent: every gesture
+// presses a real button, no button is on two gestures, and the floating
+// buttons don't repeat what the hands already do.
+export function sanitizeVision(raw, labels = {}) {
+  const drag = (value, usual) => (HAND_DRAGS.includes(value) ? value : usual);
+  const leftDrag = drag(raw?.leftDrag, 'LS');
+  let rightDrag = drag(raw?.rightDrag, 'RS');
+  if (rightDrag === leftDrag && rightDrag !== 'NONE') rightDrag = leftDrag === 'RS' ? 'LS' : 'RS';
+
+  const used = new Set();
+  let gestures = {};
+  for (const gesture of HAND_GESTURES) {
+    const target = Object.hasOwn(raw?.gestures ?? {}, gesture) ? raw.gestures[gesture] : null;
+    if (!BUTTON_TARGETS.includes(target) || used.has(target)) continue;
+    gestures[gesture] = target;
+    used.add(target);
+  }
+  if (!used.size) {
+    gestures = { ...USUAL_GESTURES };
+    for (const target of Object.values(gestures)) used.add(target);
+  }
+
+  const wanted = Array.isArray(raw?.panel) ? raw.panel : [...Object.keys(labels), ...USUAL_PANEL];
+  const panel = [];
+  for (const target of wanted) {
+    if (panel.length >= PANEL_MAX) break;
+    if (BUTTON_TARGETS.includes(target) && !used.has(target) && !panel.includes(target)) panel.push(target);
+  }
+  return { leftDrag, rightDrag, gestures, panel };
+}
+
 export function sanitizeLayout(raw) {
   const name = plainText(raw?.game ?? raw?.name, 60) || 'This game';
   const mouseLook = Boolean(raw?.mouseLook);
@@ -179,9 +230,12 @@ export function sanitizeLayout(raw) {
   const labels = {};
   for (const [target, label] of Object.entries(raw?.labels ?? {})) {
     const text = plainText(label, 28);
-    if (Object.hasOwn(TARGET_NAMES, target) && text) labels[target] = text;
+    if (BUTTON_TARGETS.includes(target) && text) labels[target] = text;
   }
-  const layout = { id: layoutId(name), name, about: plainText(raw?.about, 160), mouseLook, keys, labels, built: true };
+  const layout = {
+    id: layoutId(name), name, about: plainText(raw?.about, 160), mouseLook, keys, labels,
+    vision: sanitizeVision(raw?.vision, labels), built: true,
+  };
 
   // Every game must stay fully playable: give whatever was left out the key
   // it has in the nearest built-in layout, or failing that any free key.

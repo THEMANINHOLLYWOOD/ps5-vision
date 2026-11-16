@@ -9,7 +9,7 @@ import { consoleEndedIt, describeQuit, normalizeOptions, shouldRejoin } from './
 import { txtRecord } from './bonjour.js';
 import { nextAudioSamples } from './viewer.js';
 import { BUTTON, encodeState, idleState, readGamepad, statesEqual } from '../web/controller.js';
-import { KEY_GUIDE, KEY_MAP, LAYOUTS, TARGETS, compileLayout, findLayout, guideFor, isMappedKey, keyboardState, mergeStates, mouseToStick, sanitizeLayout, unreachable } from '../web/keyboard.js';
+import { BUTTON_TARGETS, HAND_GESTURES, KEY_GUIDE, KEY_MAP, LAYOUTS, TARGETS, compileLayout, findLayout, guideFor, isMappedKey, keyboardState, mergeStates, mouseToStick, sanitizeLayout, sanitizeVision, unreachable } from '../web/keyboard.js';
 import { LayoutStore, buildLayout, cleanGameName, findClaude, layoutRequest } from './layouts.js';
 import { wirelessDisplayIn } from './sharing.js';
 import fs from 'node:fs';
@@ -560,6 +560,45 @@ test('a layout from Claude is only used after everything doubtful is removed', (
   assert.deepEqual(unreachable(sanitizeLayout({ game: 7, keys: 'no', labels: [] })), []);
   // Without mouse look, the mouse buttons are not for binding.
   assert.ok(!Object.hasOwn(sanitizeLayout({ ...ANSWER, mouseLook: false }).keys, 'Mouse0'));
+});
+
+test('hand controls from Claude press only real buttons, each on one gesture', () => {
+  const vision = sanitizeVision({
+    leftDrag: 'LS',
+    rightDrag: 'LS', // both hands can't be the same stick
+    gestures: {
+      rightMiddle: 'R2', leftMiddle: 'L2', rightRing: 'CROSS',
+      leftRing: 'R2', // already on the right middle finger
+      rightLittle: 'LS_UP', // a stick direction is not a button
+      thirdHand: 'CIRCLE', // no such gesture
+      __proto__: 'PS',
+    },
+    panel: ['SQUARE', 'R2', 'TRIANGLE', 'SQUARE', 'SELF_DESTRUCT', ...BUTTON_TARGETS],
+  });
+  assert.equal(vision.leftDrag, 'LS');
+  assert.equal(vision.rightDrag, 'RS');
+  assert.deepEqual(vision.gestures, { rightMiddle: 'R2', leftMiddle: 'L2', rightRing: 'CROSS' });
+  assert.equal(vision.panel.length, 8);
+  assert.deepEqual(vision.panel.slice(0, 2), ['SQUARE', 'TRIANGLE']);
+  assert.ok(vision.panel.every((target) => BUTTON_TARGETS.includes(target) && !Object.values(vision.gestures).includes(target)));
+  assert.equal(new Set(vision.panel).size, vision.panel.length);
+
+  // Nothing usable sent (or a layout saved before hands existed): sticks on
+  // the index fingers, the usual buttons on the others, what the game labels
+  // floating under the screen.
+  const usual = sanitizeVision(undefined, { TRIANGLE: 'switch weapon', DPAD_UP: 'ping', CROSS: 'jump' });
+  assert.deepEqual([usual.leftDrag, usual.rightDrag], ['LS', 'RS']);
+  assert.deepEqual(Object.keys(usual.gestures).sort(), [...HAND_GESTURES].sort());
+  assert.equal(usual.panel[0], 'DPAD_UP', 'what the game labels comes first, minus what a gesture already does');
+  assert.ok(!usual.panel.includes('CROSS'));
+  assert.deepEqual(sanitizeVision({ leftDrag: 'DPAD', rightDrag: 'NONE', gestures: 'no', panel: 'no' }).leftDrag, 'DPAD');
+
+  // And every built layout carries them.
+  const layout = sanitizeLayout({ ...ANSWER, labels: { ...ANSWER.labels, DPAD_UP: 'ping' }, vision: { leftDrag: 'LS', rightDrag: 'RS', gestures: { rightMiddle: 'R2' }, panel: ['DPAD_UP'] } });
+  assert.deepEqual(layout.vision, { leftDrag: 'LS', rightDrag: 'RS', gestures: { rightMiddle: 'R2' }, panel: ['DPAD_UP'] });
+  assert.equal(layout.labels.DPAD_UP, 'ping');
+  assert.ok(sanitizeLayout(null).vision.panel.length > 0);
+  assert.match(layoutRequest('Astro Bot'), /rightMiddle/);
 });
 
 test('a typed game name is reduced to a plain title before it goes anywhere', () => {

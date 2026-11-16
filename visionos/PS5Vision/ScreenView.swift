@@ -1,4 +1,5 @@
 import CryptoKit
+import Spatial
 import SwiftUI
 import WebKit
 
@@ -7,36 +8,52 @@ import WebKit
 struct ScreenView: View {
     let bridge: Bridge
     @Environment(AppModel.self) private var model
+    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
 
     var body: some View {
         BridgeWebView(bridge: bridge, model: model)
             .aspectRatio(16 / 9, contentMode: .fit)
             .background(.black)
+            // While hands are the controller a pinch is a stick or a button,
+            // not a tap on whatever the eyes happen to be on.
+            .allowsHitTesting(!(model.handsOn && model.theaterOpen))
+            // Where this window is inside the theatre, so the glow can sit
+            // right behind it. (No answer while no immersive space is open.)
+            .onGeometryChange3D(for: ScreenCorners?.self) { proxy -> ScreenCorners? in
+                guard let place = proxy.transform(in: NamedCoordinateSpace.immersiveSpace) else { return nil }
+                let size = proxy.size
+                return ScreenCorners(
+                    topLeft: Point3D(x: 0, y: 0, z: 0).applying(place),
+                    topRight: Point3D(x: size.width, y: 0, z: 0).applying(place),
+                    bottomLeft: Point3D(x: 0, y: size.height, z: 0).applying(place)
+                )
+            } action: { corners in
+                model.screenCorners = corners
+            }
             .ornament(attachmentAnchor: .scene(.bottom), contentAlignment: .top) {
-                SizeBar()
+                ControlBar()
                     .padding(.top, 16)
             }
-            .onAppear { model.screenOpen = true }
-            .onDisappear { model.screenOpen = false }
-    }
-}
-
-private struct SizeBar: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "rectangle.expand.diagonal")
-                .foregroundStyle(.secondary)
-                .padding(.leading, 8)
-            ForEach(ScreenSize.allCases) { size in
-                Button(size.rawValue) {
-                    model.screenScene?.lockScreenShape(size: size.size)
+            // The page sends the picture's colours only while asked to. Asked
+            // again every few seconds, since the page may have reloaded.
+            .task(id: model.theaterOpen) {
+                guard model.theaterOpen else {
+                    model.controller.sink?("window.ps5SetAmbient&&ps5SetAmbient(false)")
+                    model.ambient = nil
+                    return
+                }
+                while !Task.isCancelled {
+                    model.controller.sink?("window.ps5SetAmbient&&ps5SetAmbient(true)")
+                    try? await Task.sleep(for: .seconds(3))
                 }
             }
-        }
-        .padding(8)
-        .glassBackgroundEffect()
+            .onAppear { model.screenOpen = true }
+            .onDisappear {
+                model.screenOpen = false
+                model.screenCorners = nil
+                // A theatre with no screen in it is just a dark room.
+                if model.theaterOpen { Task { await dismissImmersiveSpace() } }
+            }
     }
 }
 
@@ -131,11 +148,25 @@ struct BridgeWebView: UIViewRepresentable {
         }
 
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard let body = message.body as? [String: Any], body["type"] as? String == "rumble" else { return }
-            model.controller.rumble(
-                left: (body["left"] as? NSNumber)?.doubleValue ?? 0,
-                right: (body["right"] as? NSNumber)?.doubleValue ?? 0
-            )
+            guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
+            switch type {
+            case "rumble":
+                model.controller.rumble(
+                    left: (body["left"] as? NSNumber)?.doubleValue ?? 0,
+                    right: (body["right"] as? NSNumber)?.doubleValue ?? 0
+                )
+            case "controls":
+                // How the game on screen is played with bare hands.
+                if let controls = VisionControls(message: body), controls != model.controls { model.controls = controls }
+            case "ambient":
+                // The picture's colours, for lighting the theatre.
+                model.ambient = model.theaterOpen ? Ambient(message: body) : nil
+            case "build-note":
+                model.buildNote = String((body["text"] as? String ?? "").prefix(200))
+                model.building = body["busy"] as? Bool ?? false
+            default:
+                break
+            }
         }
 
         private func showProblem(in webView: WKWebView, _ text: String) {

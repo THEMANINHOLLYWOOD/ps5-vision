@@ -46,6 +46,8 @@
 	<array>
 		<string>_ps5vision._tcp</string>
 	</array>
+	<key>NSHandsTrackingUsageDescription</key>
+	<string>Lets you play with your hands instead of a controller: pinch and move for the sticks, touch thumb to finger for buttons. Where your hands are never leaves this headset.</string>
 	<key>NSWorldSensingUsageDescription</key>
 	<string>Remembers where your console is in the room, so you can look at it to connect. Nothing about your room is stored outside this headset.</string>
 	<key>NSAppTransportSecurity</key>

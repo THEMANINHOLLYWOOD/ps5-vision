@@ -39,6 +39,10 @@ get a keyboard layout back. Anthropic's own privacy policy covers that request.
 
 - **Local network:** to find the bridge on your Mac.
 - **World sensing:** to remember where your console is in the room.
+- **Hand tracking:** only if you turn on **Hands**, to let pinches and finger
+  touches press the controller's buttons. Where your hands are is used on the
+  headset, at that moment, and is not stored or sent anywhere; only the button
+  presses go to your Mac, like a controller's.
 
 ## Questions
 

@@ -11,7 +11,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { BINDABLE_KEYS, MOUSE_KEYS, TARGETS, sanitizeLayout } from '../web/keyboard.js';
+import { BINDABLE_KEYS, BUTTON_TARGETS, HAND_GESTURES, MOUSE_KEYS, TARGETS, sanitizeLayout } from '../web/keyboard.js';
 
 const MODEL = 'claude-opus-5-5';
 const ASK_TIMEOUT_MS = 120_000;
@@ -41,10 +41,11 @@ export function findClaude(env = process.env) {
   return null;
 }
 
-const SYSTEM = 'You set up keyboard-and-mouse controls for PlayStation 5 games that are being played '
-  + 'remotely from a computer. Given a game, you assign keyboard keys and mouse buttons to the '
-  + 'controller\'s buttons the way a PC player of that game would expect, and say what each '
-  + 'controller button does in that game. You reply only with the requested JSON.';
+const SYSTEM = 'You set up controls for PlayStation 5 games that are being played remotely: '
+  + 'keyboard and mouse for a computer, and bare-hand gestures for Apple Vision Pro. Given a game, '
+  + 'you assign keys, mouse buttons and hand gestures to the controller\'s buttons the way a '
+  + 'player of that game would expect, and say what each controller button does in that game. '
+  + 'You reply only with the requested JSON.';
 
 // A name typed by a player goes into the request: keep it to a plain title.
 export function cleanGameName(name) {
@@ -76,8 +77,25 @@ Lay out the keyboard and mouse for this game:
   The arrow keys, Enter and Backspace already work the menus (D-pad, CROSS, CIRCLE): do not bind them.
   Do not use Escape, Control, Alt or Command.
 - labels: for each controller button the game uses (not the sticks), what it does in this game, in
-  one to three words, lower case: "reload", "jump", "light attack".
-- about: one short sentence on how the layout is arranged.`;
+  one to three words, lower case: "reload", "jump", "light attack". Include the D-pad directions
+  the game uses (DPAD_UP and so on).
+- about: one short sentence on how the layout is arranged.
+- vision: the same game played in Apple Vision Pro with bare hands and no controller.
+  - leftDrag, rightDrag: what that hand does when the player pinches thumb and index finger
+    together and moves the hand: "LS" or "RS" (that stick, pushed the way the hand moves), "DPAD"
+    (the four D-pad directions) or "NONE". Nearly always leftDrag "LS" and rightDrag "RS". Use
+    "DPAD" for a hand only in games steered with the D-pad, and never the same value for both.
+  - gestures: maps ${HAND_GESTURES.join(', ')} to a controller button. Each is the thumb touching
+    that finger of that hand, and the button stays pressed for as long as they touch. The middle
+    fingers are the quickest and can be held while the same hand's stick is in use: give them the
+    two actions pressed most in the middle of play (in a shooter rightMiddle fires and leftMiddle
+    aims; in a platformer rightMiddle jumps). Ring fingers get the next most used. The little
+    fingers are slow and easy to trigger by accident: give them something occasional and
+    harmless, or leave them out. A button goes on one gesture at most.
+    Buttons: ${BUTTON_TARGETS.join(', ')}.
+  - panel: up to 8 more of those buttons, most used first, that float under the screen for the
+    player to look at and pinch. That takes about half a second, so choose actions that can wait:
+    reload, switch weapon, map, inventory, pause. Leave out buttons that already have a gesture.`;
 }
 
 const ANSWER_SCHEMA = JSON.stringify({
@@ -89,8 +107,18 @@ const ANSWER_SCHEMA = JSON.stringify({
     keys: { type: 'object', additionalProperties: { type: 'string' } },
     labels: { type: 'object', additionalProperties: { type: 'string' } },
     about: { type: 'string' },
+    vision: {
+      type: 'object',
+      properties: {
+        leftDrag: { type: 'string' },
+        rightDrag: { type: 'string' },
+        gestures: { type: 'object', additionalProperties: { type: 'string' } },
+        panel: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['leftDrag', 'rightDrag', 'gestures', 'panel'],
+    },
   },
-  required: ['game', 'recognized', 'mouseLook', 'keys', 'labels', 'about'],
+  required: ['game', 'recognized', 'mouseLook', 'keys', 'labels', 'about', 'vision'],
 });
 
 // Asks Claude. image: a JPEG as a Buffer, or null when only a name is known.

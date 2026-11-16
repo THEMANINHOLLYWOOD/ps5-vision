@@ -12,6 +12,15 @@ final class NativeController {
     /// Runs JavaScript in the page; set while a screen is open.
     var sink: ((String) -> Void)?
 
+    /// What the hands and the floating buttons are pressing: added to the
+    /// controller, or all there is when there is none.
+    var hands = ExtraInput()
+    var floating = ExtraInput()
+    /// Hands are in use, so the page should hear from the app even while
+    /// nothing is pressed and no controller is paired.
+    var extrasOn = false
+    private var wasLive = false
+
     private var pollTask: Task<Void, Never>?
     private var lastScript = ""
     private var lastSentAt = Date.distantPast
@@ -59,7 +68,17 @@ final class NativeController {
     }
 
     private func poll() {
-        guard let sink, let pad = current?.extendedGamepad else { return }
+        guard let sink else { return }
+        let extra = hands.merged(with: floating)
+        guard let pad = current?.extendedGamepad else {
+            // No controller: the hands and floating buttons are the controller.
+            let live = extrasOn || !extra.isIdle
+            guard live || wasLive else { return } // one last "nothing pressed", then quiet
+            wasLive = live
+            send(extra, to: sink)
+            return
+        }
+        wasLive = true
         var buttons = 0
         func add(_ pressed: Bool, _ bit: Int) { if pressed { buttons |= bit } }
         add(pad.buttonA.isPressed, Bit.cross)
@@ -82,10 +101,18 @@ final class NativeController {
         let trigger = { (value: Float) in Int((max(0, min(1, value)) * 255).rounded()) }
         // The console counts down as positive, the opposite of GameController.
         let stick = { (value: Float) in abs(value) < 0.02 ? 0 : Int((max(-1, min(1, value)) * 32767).rounded()) }
-        let script = "window.ps5NativeInput&&ps5NativeInput({buttons:\(buttons),"
-            + "l2:\(trigger(pad.leftTrigger.value)),r2:\(trigger(pad.rightTrigger.value)),"
-            + "lx:\(stick(pad.leftThumbstick.xAxis.value)),ly:\(stick(-pad.leftThumbstick.yAxis.value)),"
-            + "rx:\(stick(pad.rightThumbstick.xAxis.value)),ry:\(stick(-pad.rightThumbstick.yAxis.value))})"
+        let fromPad = ExtraInput(
+            buttons: buttons,
+            l2: trigger(pad.leftTrigger.value), r2: trigger(pad.rightTrigger.value),
+            lx: stick(pad.leftThumbstick.xAxis.value), ly: stick(-pad.leftThumbstick.yAxis.value),
+            rx: stick(pad.rightThumbstick.xAxis.value), ry: stick(-pad.rightThumbstick.yAxis.value)
+        )
+        send(fromPad.merged(with: extra), to: sink)
+    }
+
+    private func send(_ state: ExtraInput, to sink: (String) -> Void) {
+        let script = "window.ps5NativeInput&&ps5NativeInput({buttons:\(state.buttons),"
+            + "l2:\(state.l2),r2:\(state.r2),lx:\(state.lx),ly:\(state.ly),rx:\(state.rx),ry:\(state.ry)})"
 
         // Send changes at once, and repeat the current state now and then so
         // the page knows the controller is still there.

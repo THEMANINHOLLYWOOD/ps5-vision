@@ -1,4 +1,5 @@
 import Foundation
+import Spatial
 import UIKit
 
 /// The app's name as people see it (set once, as APP_NAME in project.yml).
@@ -11,6 +12,38 @@ let setupGuide = URL(string: "https://github.com/THEMANINHOLLYWOOD/ps5-vision#re
 final class AppModel {
     let browser = BridgeBrowser()
     let controller = NativeController()
+    let hands = HandControls()
+
+    /// How the game on screen is played with bare hands; the page sends it.
+    var controls = VisionControls() {
+        didSet { hands.controls = controls }
+    }
+    /// The immersive theatre is open: the room is dark and lit by the game.
+    var theaterOpen = false {
+        didSet { followHands() }
+    }
+    /// The person wants to play with their hands (in the theatre, where
+    /// hands can be followed).
+    var handsOn: Bool {
+        didSet {
+            UserDefaults.standard.set(handsOn, forKey: "hands-on")
+            followHands()
+        }
+    }
+    /// Show the game's buttons under the screen. Until chosen: shown when
+    /// there is no controller to press them on.
+    var buttonsChosen: Bool? {
+        didSet { UserDefaults.standard.set(buttonsChosen, forKey: "buttons-shown") }
+    }
+    var buttonsShown: Bool { buttonsChosen ?? (controller.name == nil) }
+    /// The picture's colours, a few times a second, while the theatre is open.
+    var ambient: Ambient?
+    /// Where the screen's window is inside the theatre.
+    var screenCorners: ScreenCorners?
+    /// What building this game's controls is up to, in the page's words.
+    var buildNote = ""
+    var building = false
+    private var floating: Set<PadTarget> = []
 
     /// A bridge typed in by hand wins over ones found on the network.
     var typedBridge: Bridge? {
@@ -31,11 +64,39 @@ final class AppModel {
     weak var screenScene: UIWindowScene?
 
     init() {
+        handsOn = UserDefaults.standard.bool(forKey: "hands-on")
+        buttonsChosen = UserDefaults.standard.object(forKey: "buttons-shown") as? Bool
         spotSaved = UserDefaults.standard.bool(forKey: "spot-saved")
         if let data = UserDefaults.standard.data(forKey: "typed-bridge") {
             typedBridge = try? JSONDecoder().decode(Bridge.self, from: data)
         }
         browser.start()
+        hands.onChange = { [weak self] input in self?.controller.hands = input }
+    }
+
+    /// Hands can only be followed inside an immersive space, so they are the
+    /// controller exactly while the theatre is open and they are wanted.
+    private func followHands() {
+        let wanted = handsOn && theaterOpen
+        controller.extrasOn = wanted
+        if wanted { hands.start() } else { hands.stop() }
+    }
+
+    /// A floating button going down, and coming back up.
+    func press(_ target: PadTarget) {
+        floating.insert(target)
+        sendFloating()
+    }
+
+    func release(_ target: PadTarget) {
+        floating.remove(target)
+        sendFloating()
+    }
+
+    private func sendFloating() {
+        var input = ExtraInput()
+        for target in floating { input.press(target) }
+        controller.floating = input
     }
 
     private func save(_ bridge: Bridge?, as key: String) {
@@ -45,6 +106,14 @@ final class AppModel {
             UserDefaults.standard.removeObject(forKey: key)
         }
     }
+}
+
+/// Three corners of the screen's window, in the immersive space's own
+/// coordinates: enough to know where it is, how big, and which way it faces.
+struct ScreenCorners: Equatable {
+    var topLeft: Point3D
+    var topRight: Point3D
+    var bottomLeft: Point3D
 }
 
 /// Screen sizes to pick from, like Mac Virtual Display's. Widths are in

@@ -5,7 +5,7 @@ import { FrameParser, encodeFrame } from './framing.js';
 import { AccessUnitSplitter, hasParameterSets, hevcNalTypes, isKeyframe, nalTypes } from './h264.js';
 import { OggOpusReader } from './ogg.js';
 import { broadcastAddresses, findLinkedConsole, locateConsole, parseDiscoveryResponse, wakeCredential } from './discovery.js';
-import { consoleEndedIt, describeQuit, normalizeOptions, shouldRejoin } from './bridge.js';
+import { consoleEndedIt, describeQuit, loginRefused, normalizeOptions, shouldRejoin } from './bridge.js';
 import { txtRecord } from './bonjour.js';
 import { nextAudioSamples } from './viewer.js';
 import { BUTTON, encodeState, idleState, readGamepad, statesEqual } from '../web/controller.js';
@@ -173,6 +173,16 @@ test('known session failures get a plain-language explanation', () => {
   assert.match(describeQuit('RP-Version mismatch', ''), /system software is newer/);
   assert.equal(describeQuit('Something new', 'code 7'), 'Something new (code 7)');
   assert.equal(describeQuit('Something new', ''), 'Something new');
+});
+
+test('a PS5 that will not sign in says how to clear it without a TV', () => {
+  assert.equal(loginRefused('[E] Ctrl did not receive session id'), true);
+  assert.equal(loginRefused('[I] Ctrl received Login message: success'), false);
+  const reason = 'Unknown Error in Stream Connection';
+  assert.match(describeQuit(reason, '', { refused: true }), /power button on the PS5 once/);
+  assert.equal(describeQuit(reason, ''), reason);
+  // Only that failure: a refusal noted earlier does not rewrite other endings.
+  assert.match(describeQuit('Remote Play on Console is already in use', '', { refused: true }), /Another device/);
 });
 
 // ------------------------------------------------------------ controller

@@ -63,7 +63,19 @@ const QUIT_HINTS = [
   [/disconnected/i, 'The PS5 closed the connection.'],
 ];
 
-export function describeQuit(reason, detail) {
+// The helper's log line for a PS5 that answers, accepts the pairing, and then
+// will not sign the player in: no session follows, and the stream is refused.
+// Seen after a system software update with nobody at the console.
+export function loginRefused(line) {
+  return /did not receive session id/i.test(line);
+}
+
+const LOGIN_REFUSED_HINT = 'The PS5 answered but would not sign in for Remote Play. '
+  + 'Press the power button on the PS5 once (one beep, the light turns orange), wait a few seconds, '
+  + 'then connect again: the bridge wakes the PS5 and it signs in by itself.';
+
+export function describeQuit(reason, detail, { refused = false } = {}) {
+  if (refused && /stream connection/i.test(reason)) return LOGIN_REFUSED_HINT;
   for (const [pattern, hint] of QUIT_HINTS) if (pattern.test(reason)) return hint;
   return detail ? `${reason} (${detail})` : reason;
 }
@@ -410,7 +422,11 @@ export class Bridge {
     this.header = null;
     this.framesLost = 0;
 
-    source.on('log', (line) => this.log(`  ${line}`));
+    this.loginRefused = false;
+    source.on('log', (line) => {
+      if (loginRefused(line)) this.loginRefused = true;
+      this.log(`  ${line}`);
+    });
     source.on('header', (header) => {
       this.header = header;
       // New parameter sets mean a new picture format: restart on a keyframe.
@@ -530,7 +546,7 @@ export class Bridge {
         this.viewer?.sendControl({
           type: 'ended',
           error: Boolean(event.error),
-          message: event.error ? describeQuit(event.reason, event.detail) : 'Session ended.',
+          message: event.error ? describeQuit(event.reason, event.detail, { refused: this.loginRefused }) : 'Session ended.',
         });
         break;
       default:
